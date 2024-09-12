@@ -1,0 +1,6 @@
+[submodule "Adafruit_CircuitPython_Display_Text"]
+	path = Adafruit_CircuitPython_Display_Text
+	url = https://github.com/adafruit/Adafruit_CircuitPython_Display_Text.git
+[submodule "Adafruit_CircuitPython_Bitmap_Font"]
+	path = Adafruit_CircuitPython_Bitmap_Font
+	url = https://github.com/adafruit/Adafruit_CircuitPython_Bitmap_Font.git
