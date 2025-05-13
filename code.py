@@ -7,6 +7,7 @@ import socketpool
 import ssl
 import adafruit_requests
 import adafruit_ntp
+import gc
 from adafruit_display_text import label
 from adafruit_matrixportal.matrix import Matrix
 from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
@@ -18,6 +19,7 @@ sport = "baseball"
 league = "mlb"
 update_time = 10.0
 refresh_rate = 180.0
+refresh_each_pass = False
 
 # Load Wi-Fi secrets
 try:
@@ -229,6 +231,11 @@ while True:
         away_team_label.text = competitions[i].away_team_abbr
         home_team_label.text = competitions[i].home_team_abbr
 
+        x, y, width, height = home_team_label.bounding_box
+        home_team_label.x = (32 + (32-width) // 2)
+        x, y, width, height = away_team_label.bounding_box
+        away_team_label.x = (64 + (32-width) // 2)
+
         # Update the Team Logos
         load_logo(logo_away, competitions[i].away_team_abbr)
         load_logo(logo_home, competitions[i].home_team_abbr)
@@ -246,6 +253,12 @@ while True:
             game_date_label.text = ""
             game_status_label.text = competitions[i].shortDetail
 
+        # Center the Scores
+        x, y, width, height = away_score_label.bounding_box
+        away_score_label.x = 32 + (32-width) // 2
+        x, y, width, height = home_score_label.bounding_box
+        home_score_label.x = 64 + (32-width) // 2
+
         # Center the Game Status Info
         x, y, width, height = game_status_label.bounding_box
         game_status_label.x = (128-width) // 2
@@ -254,8 +267,10 @@ while True:
 
         # Current Time Seconds
         current_time_seconds = time.monotonic()
-        if ((current_time_seconds - last_update_time_seconds) > refresh_rate):
+        if ((current_time_seconds - last_update_time_seconds) > refresh_rate) or (refresh_each_pass and (i == 0)):
             print("Refreshing data!")
+            display.auto_refresh = False
+            gc.collect()
 
             # Update the Scoreboard Configuration
             response = aio._get(url)
@@ -266,6 +281,8 @@ while True:
 
             events, competitions = fetch_competition_data()
             last_update_time_seconds = current_time_seconds
+
+            display.auto_refresh = True
 
         # Last Pass for Response
         last_response = response
