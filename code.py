@@ -11,11 +11,13 @@ from adafruit_display_text import label
 from adafruit_matrixportal.matrix import Matrix
 from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
 from adafruit_datetime import datetime
+from competition import Competition
 
 # Configuration
 sport = "baseball"
-league = "college-baseball"
-update_time = 5.0
+league = "mlb"
+update_time = 10.0
+refresh_rate = 180.0
 
 # Load Wi-Fi secrets
 try:
@@ -132,36 +134,46 @@ def parse_iso8601(iso_str):
     second = int(iso_str[17:19]) if len(iso_str) > 18 else 0
     return time.struct_time((year, month, day, hour, minute, second, 0, -1, -1))
 
-# Function to fetch latest UFL game results
-def fetch_latest_result(event_index=0):
-    try:
-        # ESPN API endpoint for NFL scoreboard
-        url = "https://site.api.espn.com/apis/site/v2/sports/%s/%s/scoreboard" % (sport, league)
-        response = https.get(url)
-        data = response.json()
+# Function to initialize data for competitions
+def fetch_competition_data():
+    # ESPN API endpoint for NFL scoreboard
+    url = "https://site.api.espn.com/apis/site/v2/sports/%s/%s/scoreboard" % (sport, league)
+    response = https.get(url)
+    data = response.json()
 
-        # Parse the JSON data to extract the latest game score
-        events = data.get("events", [])
-        num_events = len(events)
-        if not events:
-            return "No games found."
+    # Parse the JSON data to extract the latest game score
+    events = data.get("events", [])
+    num_events = len(events)
+    if not events:
+        return "No games found."
 
-        latest_event = events[event_index]
-        competitions = latest_event.get("competitions", [])
-        if not competitions:
-            return "No competition data."
+    # Initialize Data for Competitions
+    competitions = []
+    for event in events:
+        competition = Competition()
 
-        competition = competitions[0]
-        status = competition.get("status").get("type").get("shortDetail")
-        state = competition.get("status").get("type").get("state")
-        if state == "post":
-            date = ""
-            game_time = "Final"
-        elif state == "pre":
-            date = status.split(" - ")[0]
+        data = event.get("competitions", [])[0]
+
+        # Retreive the Competition Status
+        competition.state = data.get("status").get("type").get("state")
+        competition.shortDetail = data.get("status").get("type").get("shortDetail")
+
+        # Competition Team Information
+        competitors = data.get("competitors", [])
+        for i in range(0,2):
+            if competitors[i].get("homeAway") == "home":
+                competition.home_team_abbr = competitors[i].get("team").get("abbreviation")
+                competition.home_team_score = competitors[i].get("score")
+            else:
+                competition.away_team_abbr = competitors[i].get("team").get("abbreviation")
+                competition.away_team_score = competitors[i].get("score")
+
+        # Set the Game Date and Time
+        if competition.state == "pre":
+            competition.date = competition.shortDetail.split(" - ")[0]
 
             # Convert UTC ISO8601 timestamp manually
-            iso_time = competition["date"]  # e.g. '2024-09-01T17:25Z'
+            iso_time = data["date"]  # e.g. '2024-09-01T17:25Z'
             utc_struct = parse_iso8601(iso_time)
             utc_seconds = time.mktime(utc_struct)
 
@@ -170,39 +182,15 @@ def fetch_latest_result(event_index=0):
             local_struct = time.localtime(local_seconds)
 
             # Format display
-            game_time = "{}:{:02} {}".format(
+            competition.time = "{}:{:02} {}".format(
                 local_struct.tm_hour % 12 or 12,
                 local_struct.tm_min,
                 "AM" if local_struct.tm_hour < 12 else "PM"
             )
 
-        else:
-            date = ""
-            game_time = status
+        competitions.append(competition)
 
-        competitors = competition.get("competitors", [])
-        if len(competitors) < 2:
-            return "Incomplete game data."
-
-        for i in range(0,2):
-            if competitors[i].get("homeAway") == "home":
-                home_abbr = competitors[i].get("team").get("abbreviation")
-                home_score = competitors[i].get("score")
-            else:
-                away_abbr = competitors[i].get("team").get("abbreviation")
-                away_score = competitors[i].get("score")
-
-        # Increment the Event Index
-        if event_index >= num_events-1:
-            event_index = 0
-        else:
-            event_index += 1
-
-        return state, date, game_time, away_score, home_score, home_abbr, away_abbr, event_index
-
-    except Exception as e:
-        print("Error fetching score:", e)
-        return "Score fetch error", "home_team", "away_team"
+    return events, competitions
 
 # Load a 32x32 BMP logo
 def load_logo(group, abbr):
@@ -219,37 +207,74 @@ def load_logo(group, abbr):
 # Update display in loop
 event_index = 0
 last_value = response['last_value']
+first_pass = True
+last_response = ''
 while True:
     print("Updating score...")
 
-    # Update the Scoreboard Configuration
-    response = aio._get(url)
-    if response['last_value'] != last_value:
-        try:
-            event_index = 0
-            sport = response['last_value'].split("/")[0]
-            league = response['last_value'].split("/")[1]
-        except:
-            print("Error in syntax for last command!")
-    last_value = response['last_value']
+    # Initialize Competitions
+    if first_pass:
+        # Update the Scoreboard Configuration
+        response = aio._get(url)
+        last_response = response
+        sport = response['last_value'].split("/")[0]
+        league = response['last_value'].split("/")[1]
 
-    state, date, game_time, away_score, home_score, home_abbr, away_abbr, event_index = fetch_latest_result(event_index)
-    away_team_label.text = away_abbr
-    away_score_label.text = away_score
-    home_team_label.text = home_abbr
-    if state == "pre":
-        away_score_label.text = ""
-        home_score_label.text = ""
-        game_date_label.text = date
-    else:
-        away_score_label.text = away_score
-        home_score_label.text = home_score
-        game_date_label.text = ""
-    game_status_label.text = game_time
-    x, y, width, height = game_status_label.bounding_box
-    game_status_label.x = (128-width) // 2
-    x, y, width, height = game_date_label.bounding_box
-    game_date_label.x = (128-width) // 2
-    load_logo(logo_away, away_abbr)
-    load_logo(logo_home, home_abbr)
-    time.sleep(update_time)  # Update every 60 seconds
+        events, competitions = fetch_competition_data()
+        last_update_time_seconds = time.monotonic()
+
+    i = 0
+    while i < len(competitions):
+        # Update the Team Names
+        away_team_label.text = competitions[i].away_team_abbr
+        home_team_label.text = competitions[i].home_team_abbr
+
+        # Update the Team Logos
+        load_logo(logo_away, competitions[i].away_team_abbr)
+        load_logo(logo_home, competitions[i].home_team_abbr)
+
+        # Update the Game Status
+        if competitions[i].state == "pre":
+            away_score_label.text = ""
+            home_score_label.text = ""
+            game_date_label.text = competitions[i].date
+            game_status_label.text = competitions[i].time
+        else:
+            #competitions[i] = update_competition_data(index)
+            away_score_label.text = competitions[i].away_team_score
+            home_score_label.text = competitions[i].home_team_score
+            game_date_label.text = ""
+            game_status_label.text = competitions[i].shortDetail
+
+        # Center the Game Status Info
+        x, y, width, height = game_status_label.bounding_box
+        game_status_label.x = (128-width) // 2
+        x, y, width, height = game_date_label.bounding_box
+        game_date_label.x = (128-width) // 2
+
+        # Current Time Seconds
+        current_time_seconds = time.monotonic()
+        if ((current_time_seconds - last_update_time_seconds) > refresh_rate):
+            print("Refreshing data!")
+
+            # Update the Scoreboard Configuration
+            response = aio._get(url)
+            if response != last_response:
+                sport = response['last_value'].split("/")[0]
+                league = response['last_value'].split("/")[1]
+                i = 0
+
+            events, competitions = fetch_competition_data()
+            last_update_time_seconds = current_time_seconds
+
+        # Last Pass for Response
+        last_response = response
+
+        # Sleep
+        time.sleep(update_time)
+
+        # Increment the Index
+        i = i + 1
+
+    # Reset the First Pass Flag
+    first_pass = False
