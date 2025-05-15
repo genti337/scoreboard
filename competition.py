@@ -1,16 +1,21 @@
+from team import Team
+
 # Write your code here :-)
 class Competition:
     def __init__(self):
-        self.home_team_abbr = 'NA'
-        self.home_team_score = 0
-        self.home_team_color = 0xFFFFFF
-        self.away_team_abbr = 'NA'
-        self.away_team_score = 0
-        self.away_team_color = 0x13294B
+        # Generic Data
         self.shortDetail = 'NA'
         self.state = 'NA'
         self.time = 0
         self.date = 0
-        self.inning = 1
+        self.away_team = Team()
+        self.home_team = Team()
+
+        # Baseball Data
+        self.inning = '1'
+        self.outs = '0'
+        self.on_first = 'No'
+        self.on_second = 'No'
+        self.on_third = 'No'
 
 
