@@ -18,4 +18,9 @@ class Competition:
         self.on_second = 'False'
         self.on_third = 'True'
 
+        # Football Data
+        self.yard_line = 50
+        self.possession_team = ''
+        self.down_dist = ''
+
 

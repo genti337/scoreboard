@@ -75,6 +75,12 @@ class SportsDisplay:
         self.bases_image_dict[True] = "images/base_loaded.bmp"
         self.bases_image_dict[False] = "images/base_empty.bmp"
 
+        # Football Game Status
+        self.football_field = displayio.Group(scale=1, x=32, y=24)
+        self.main_group.append(self.football_field)
+        self.football = displayio.Group(scale=1, x=96, y=27)
+        self.main_group.append(self.football)
+
     # Load a 32x32 BMP logo
     def load_logo(self, group, abbr):
         while len(group) > 0:
@@ -96,7 +102,7 @@ class SportsDisplay:
             tile_grid = displayio.TileGrid(bitmap, pixel_shader=bitmap.pixel_shader)
             group.append(tile_grid)
         except Exception as e:
-            print(f"Logo error for {abbr}: {e}")
+            print(f"Logo error for {filename}: {e}")
 
     def center_text(self, label, text, min_x, max_x):
         '''
@@ -163,6 +169,36 @@ class SportsDisplay:
 
         return target_x - width
 
+
+    def yardline_to_field_position(self, yardline_str, possession_team, home_team, away_team):
+        """
+        Converts ESPN 'yardLine' (e.g., "DAL 42") to 0–100 field position.
+        0 = left end zone, 100 = right end zone.
+        """
+        if not yardline_str or ' ' not in yardline_str:
+            return None
+
+        team_code, yard = yardline_str.split()
+        yard = int(yard)
+
+        # Determine direction of play
+        # Assume possession team is driving toward opponent's end zone
+        # Home team is on the right side of the field
+        if possession_team == away_team:
+            # Possession going right
+            if team_code == away_team:
+                x = 100 - yard
+            else:
+                x = yard
+        else:
+            # Possession going left
+            if team_code == home_team:
+                x = 100 - yard
+            else:
+                x = yard
+
+        return x
+
     def update(self, competition):
         print("Updating Display!")
 
@@ -201,7 +237,7 @@ class SportsDisplay:
                     self.outs.x = 31
                 else:
                     self.load_image(self.inning_logo, "images/bottom.bmp")
-                    self.inning_logo.y = 16
+                    self.inning_logo.y = 15
                     self.center_text(self.outs, competition.outs, 64, 96)
                     self.outs.x = self.align_text_right(96, self.outs.text, self.small_font)
                     print(self.outs.x)
@@ -210,6 +246,13 @@ class SportsDisplay:
                 self.load_image(self.first_base, self.bases_image_dict[competition.on_first])
                 self.load_image(self.second_base, self.bases_image_dict[competition.on_second])
                 self.load_image(self.third_base, self.bases_image_dict[competition.on_third])
+            elif self.sport == "football":
+                yardline = self.yardline_to_field_position("MIC 30", "MIC", "MIC", "HOU")
+                print(yardline)
+
+                self.football.x = int(34 + (92 - 36) * (yardline / 100))
+                self.load_image(self.football_field, "images/football_field.bmp")
+                self.load_image(self.football, "images/football.bmp")
 
         # Set the State of Information
         self.away_score.hidden = (competition.state == "pre")
@@ -224,6 +267,8 @@ class SportsDisplay:
         self.outs.hidden = (competition.state != "in")
         self.home_team_rank.hidden = (competition.state == "in")
         self.away_team_rank.hidden = (competition.state == "in")
-
+        self.game_status.hidden = (competition.state != "post")
+        self.away_team_record.hidden = (competition.state == "in")
+        self.home_team_record.hidden = (competition.state == "in")
 
         return

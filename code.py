@@ -18,8 +18,8 @@ from fetch_data import FetchData
 from display import SportsDisplay
 
 # Configuration
-sport = "baseball"
-league = "college-baseball"
+sport = "football"
+league = "ufl"
 update_time = 10.0
 refresh_rate = 180.0
 refresh_each_pass = False

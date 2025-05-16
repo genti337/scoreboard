@@ -98,12 +98,13 @@ class FetchData:
              )
 
         elif competition.state == "in":
+            # Situation Data Structure
+            situation = competition_data.get("situation")
+
             # Set the Current Inning
             if self.sport == "baseball":
                 # Inning
                 competition.inning = competition.shortDetail.split()[1]
-
-                situation = competition_data.get("situation")
 
                 # Outs
                 competition.outs = str(situation.get("outs"))
@@ -117,6 +118,10 @@ class FetchData:
                 competition.on_second = situation.get("onSecond")
                 competition.on_third = situation.get("onThird")
                 print("%s %s %s %s %s" % (competition.inning, competition.outs, competition.on_first, competition.on_second, competition.on_third))
+            elif self.sport == "football":
+                competition.yard_line = situation.get("yardLine")
+                competition.possession_team = self.get('possession')
+                competition.down_dist = self.get('downDistanceText')
 
         # Append to Competitions
         self.competitions.append(competition)
