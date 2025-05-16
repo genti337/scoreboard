@@ -13,9 +13,9 @@ class Competition:
 
         # Baseball Data
         self.inning = '1'
-        self.outs = '0'
-        self.on_first = 'No'
-        self.on_second = 'No'
-        self.on_third = 'No'
+        self.outs = '0 Outs'
+        self.on_first = 'False'
+        self.on_second = 'False'
+        self.on_third = 'True'
 
 

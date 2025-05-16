@@ -55,11 +55,26 @@ class FetchData:
                 competition.home_team.abbr = competitors[i].get("team").get("abbreviation")
                 competition.home_team.color = self.hex_to_rgb(competitors[i].get("team").get("color", "FFFFFF"))
                 competition.home_team.score = competitors[i].get("score")
+                try:
+                    competition.home_team.record = competitors[i].get("records", [])[0].get("summary")
+                except:
+                    pass
+                try:
+                    competition.away_team.rank = f"#{competitors[i].get("curatedRank").get("current")}"
+                except:
+                    pass
             else:
                 competition.away_team.abbr = competitors[i].get("team").get("abbreviation")
                 competition.away_team.color = self.hex_to_rgb(competitors[i].get("team").get("color", "FFFFFF"))
                 competition.away_team.score = competitors[i].get("score")
-
+                try:
+                    competition.away_team.record = competitors[i].get("records", [])[0].get("summary")
+                except:
+                    pass
+                try:
+                    competition.home_team.rank = f"#{competitors[i].get("curatedRank").get("current")}"
+                except:
+                    pass
 
         # Set the Game Date and Time
         if competition.state == "pre":
@@ -91,7 +106,11 @@ class FetchData:
                 situation = competition_data.get("situation")
 
                 # Outs
-                competition.outs = situation.get("outs")
+                competition.outs = str(situation.get("outs"))
+                if competition.outs == "None":
+                    competition.outs = ""
+                else:
+                    competition.outs += " Out"
 
                 # Base Status
                 competition.on_first = situation.get("onFirst")

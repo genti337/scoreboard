@@ -19,13 +19,10 @@ from display import SportsDisplay
 
 # Configuration
 sport = "baseball"
-league = "mlb"
+league = "college-baseball"
 update_time = 10.0
 refresh_rate = 180.0
 refresh_each_pass = False
-
-# Load the Tom Thumb font
-small_font = bitmap_font.load_font("/fonts/tom-thumb.bdf")
 
 # Initialize display
 displayio.release_displays()

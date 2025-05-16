@@ -2,12 +2,13 @@ import displayio
 import terminalio
 from adafruit_display_text import label
 from adafruit_bitmap_font import bitmap_font
+from collections import OrderedDict
 
 # Write your code here :-)
 class SportsDisplay:
     def __init__(self, display, sport, league):
         # Load the Tom Thumb font
-        self.small_font = bitmap_font.load_font("/fonts/tom-thumb.bdf")
+        self.small_font = bitmap_font.load_font("/fonts/04B_03__6pt.pcf")
 
         # Sport and League
         self.sport = sport
@@ -29,6 +30,18 @@ class SportsDisplay:
         self.home_team_abbr = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=64, y=5)
         self.main_group.append(self.home_team_abbr)
 
+        # Team Ranks
+        self.away_team_rank = label.Label(self.small_font, text="", color=0xFFFFFF, x=32, y=20)
+        self.main_group.append(self.away_team_rank)
+        self.home_team_rank = label.Label(self.small_font, text="", color=0xFFFFFF, x=84, y=20)
+        self.main_group.append(self.home_team_rank)
+
+        # Team Record
+        self.away_team_record = label.Label(self.small_font, text="", color=0xFFFFFF, x=36, y=12)
+        self.main_group.append(self.away_team_record)
+        self.home_team_record = label.Label(self.small_font, text="", color=0xFFFFFF, x=36, y=12)
+        self.main_group.append(self.home_team_record)
+
         # Scores
         self.away_score = label.Label(terminalio.FONT, text="", color=0xFFFF00, x=36, y=15)
         self.main_group.append(self.away_score)
@@ -36,16 +49,31 @@ class SportsDisplay:
         self.main_group.append(self.home_score)
 
         # Game Date and Time
-        self.game_date = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=48, y=15)
+        self.game_date = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=20)
         self.main_group.append(self.game_date)
-        self.game_time = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=48, y=27)
+        self.game_time = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=27)
         self.main_group.append(self.game_time)
+        self.game_status = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=15)
+        self.main_group.append(self.game_status)
 
-        # Game Status
-        self.inning = label.Label(self.small_font, text="", color=0xFFFF00, x=48, y=5)
+        # Baseball Game Status
+        self.inning = label.Label(self.small_font, text="", color=0xFFFF00, x=48, y=19)
         self.main_group.append(self.inning)
-        self.inning_logo = displayio.Group(scale=1, x=60, y=2)
+        self.inning_logo = displayio.Group(scale=1, x=60, y=27)
         self.main_group.append(self.inning_logo)
+        self.outs = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=27)
+        self.main_group.append(self.outs)
+        self.first_base = displayio.Group(scale=1, x=66, y=9)
+        self.main_group.append(self.first_base)
+        self.second_base = displayio.Group(scale=1, x=60, y=3)
+        self.main_group.append(self.second_base)
+        self.third_base = displayio.Group(scale=1, x=54, y=9)
+        self.main_group.append(self.third_base)
+
+        # Ordered Dictionary for Bases Loaded State
+        self.bases_image_dict = OrderedDict()
+        self.bases_image_dict[True] = "images/base_loaded.bmp"
+        self.bases_image_dict[False] = "images/base_empty.bmp"
 
     # Load a 32x32 BMP logo
     def load_logo(self, group, abbr):
@@ -87,6 +115,21 @@ class SportsDisplay:
 
         return
 
+    def center_image(self, image_width, min_x, max_x):
+        '''
+        Center a label horizontally between min_x and max_x.
+
+        Parameters:
+            label (Label): The displayio or adafruit_display_text label.
+            text (string): Label Text
+            min_x (int): Minimum x position of the area to center in.
+            max_x (int): Maximum x position of the area to center in.
+        '''
+
+        image_x = min_x + (max_x - min_x - image_width) // 2
+
+        return image_x
+
     def center_label_and_image(self, label, image_width, min_x, max_x, spacing=0):
         """
         Centers a label and an image that appears immediately to its right.
@@ -115,6 +158,11 @@ class SportsDisplay:
 
         return image_x
 
+    def align_text_right(self, target_x, text, font):
+        width = sum(font.get_glyph(ord(c)).shift_x for c in text if font.get_glyph(ord(c)))
+
+        return target_x - width
+
     def update(self, competition):
         print("Updating Display!")
 
@@ -131,20 +179,37 @@ class SportsDisplay:
         self.center_text(self.home_score, competition.home_team.score, 76, 92)
 
         # Pre-Game Information
+        #competition.state = "in"
         if competition.state == "pre":
             self.center_text(self.game_date, competition.date, 32, 96)
             self.center_text(self.game_time, competition.time, 32, 96)
+            self.center_text(self.away_team_record, competition.away_team.record, 32, 64)
+            self.center_text(self.home_team_record, competition.home_team.record, 64, 96)
+            self.center_text(self.away_team_rank, competition.away_team.rank, 32, 48)
+            self.center_text(self.home_team_rank, competition.home_team.rank, 80, 96)
         elif competition.state == "post":
-            self.center_text(self.game_time, competition.shortDetail, 32, 96)
+            self.center_text(self.game_status, "Final", 32, 96)
+            self.center_text(self.away_team_record, competition.away_team.record, 32, 64)
+            #self.center_text(self.home_team_record, competition.home_team.record, 64, 96)
         elif competition.state == "in":
-            self.inning.text = competition.inning
-            if competition.shortDetail.find("Top"):
-                self.load_image(self.inning_logo, "images/top.bmp")
-                self.inning_logo.y = 2
-            else:
-                self.load_image(self.inning_logo, "images/bottom.bmp")
-                self.inning_logo.y=0
-            self.inning_logo.x = self.center_label_and_image(self.inning, 7, 32, 96, spacing=1)
+            if self.sport == "baseball":
+                self.inning.text = competition.inning
+                self.outs.text = competition.outs
+                if competition.shortDetail.find("Top"):
+                    self.load_image(self.inning_logo, "images/top.bmp")
+                    self.inning_logo.y = 18
+                    self.outs.x = 31
+                else:
+                    self.load_image(self.inning_logo, "images/bottom.bmp")
+                    self.inning_logo.y = 16
+                    self.center_text(self.outs, competition.outs, 64, 96)
+                    self.outs.x = self.align_text_right(96, self.outs.text, self.small_font)
+                    print(self.outs.x)
+                self.inning_logo.x = self.center_label_and_image(self.inning, 7, 32, 96, spacing=1)
+
+                self.load_image(self.first_base, self.bases_image_dict[competition.on_first])
+                self.load_image(self.second_base, self.bases_image_dict[competition.on_second])
+                self.load_image(self.third_base, self.bases_image_dict[competition.on_third])
 
         # Set the State of Information
         self.away_score.hidden = (competition.state == "pre")
@@ -153,5 +218,12 @@ class SportsDisplay:
         self.game_time.hidden = (competition.state == "in")
         self.inning_logo.hidden = (competition.state != "in")
         self.inning.hidden = (competition.state != "in")
+        self.first_base.hidden = (competition.state != "in")
+        self.second_base.hidden = (competition.state != "in")
+        self.third_base.hidden = (competition.state != "in")
+        self.outs.hidden = (competition.state != "in")
+        self.home_team_rank.hidden = (competition.state == "in")
+        self.away_team_rank.hidden = (competition.state == "in")
+
 
         return
