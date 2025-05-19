@@ -47,6 +47,8 @@ class FetchData:
         # Retreive the Competition Status
         competition.state = competition_data.get("status").get("type").get("state")
         competition.shortDetail = competition_data.get("status").get("type").get("shortDetail")
+        competition.period = competition_data.get("status").get("period")
+        competition.clock = competition_data.get("status").get("displayClock")
 
         # Competition Team Information
         competitors = competition_data.get("competitors", [])
@@ -77,6 +79,7 @@ class FetchData:
                     pass
 
         # Set the Game Date and Time
+        #competition.state = 'in'
         if competition.state == "pre":
             # Competition Date
             competition.date = competition.shortDetail.split(" - ")[0]
@@ -119,9 +122,8 @@ class FetchData:
                 competition.on_third = situation.get("onThird")
                 print("%s %s %s %s %s" % (competition.inning, competition.outs, competition.on_first, competition.on_second, competition.on_third))
             elif self.sport == "football":
-                competition.yard_line = situation.get("yardLine")
-                competition.possession_team = self.get('possession')
-                competition.down_dist = self.get('downDistanceText')
+                #TODO
+                pass
 
         # Append to Competitions
         self.competitions.append(competition)

@@ -8,6 +8,8 @@ class Competition:
         self.state = 'NA'
         self.time = 0
         self.date = 0
+        self.period = 1
+        self.clock = ''
         self.away_team = Team()
         self.home_team = Team()
 
@@ -19,7 +21,7 @@ class Competition:
         self.on_third = 'True'
 
         # Football Data
-        self.yard_line = 50
+        self.yard_line = None
         self.possession_team = ''
         self.down_dist = ''
 
