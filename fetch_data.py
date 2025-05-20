@@ -3,7 +3,9 @@ import socketpool
 import wifi
 import ssl
 import time
+import gc
 from competition import Competition
+from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
 
 # Load Wi-Fi secrets
 try:
@@ -23,11 +25,50 @@ class FetchData:
     self.requests = adafruit_requests.Session(self.pool, ssl.create_default_context())
     self.https = adafruit_requests.Session(self.pool, ssl.create_default_context())
 
+    # Connect to Adafruit IO
+    self.aio = IO_HTTP(secrets["aio_username"], secrets["aio_key"], self.requests)
+
+    # Get the feed object
+    feed_key = 'matrix-command'
+    try:
+        self.aio.get_feed(feed_key)
+    except Exception:
+        self.aio.create_new_feed(feed_key)
+
+    # Last Pass Response
+    self.last_response = None
+
+    # Adafruit IO URL
+    self.url = f"https://io.adafruit.com/api/v2/{secrets['aio_username']}/feeds/{feed_key}"
+
+   def update_scoreboard_config(self, i):
+    # Update the Scoreboard Configuration
+    response = self.aio._get(self.url)
+    if response != self.last_response:
+        self.sport = response['last_value'].split("/")[0]
+        self.league = response['last_value'].split("/")[1]
+
+        # Reset Display Index
+        i = 0
+
+    # Last Pass Response
+    self.last_response = response
+
+    # Clean Up Response Data
+    #response.close()
+    del response
+
+    return self.sport, self.league, i
+
    def fetch_data(self):
     # ESPN API endpoint for NFL scoreboard
     url = "https://site.api.espn.com/apis/site/v2/sports/%s/%s/scoreboard" % (self.sport, self.league)
     response = self.https.get(url)
     data = response.json()
+
+    # Clean Up Response Data
+    response.close()
+    del response
 
     # Parse the JSON data to extract the latest game score
     events = data.get("events", [])
@@ -36,7 +77,7 @@ class FetchData:
         return "No games found."
 
     # Initialize Data for Competitions
-    competitions = []
+    self.competitions = []
     for event in events:
         # Fetch the data
         competition_data = event.get("competitions", [])[0]
@@ -120,13 +161,18 @@ class FetchData:
                 competition.on_first = situation.get("onFirst")
                 competition.on_second = situation.get("onSecond")
                 competition.on_third = situation.get("onThird")
-                print("%s %s %s %s %s" % (competition.inning, competition.outs, competition.on_first, competition.on_second, competition.on_third))
             elif self.sport == "football":
                 #TODO
                 pass
 
         # Append to Competitions
         self.competitions.append(competition)
+
+    # Clean Up Parsed Data Object
+    del data          # Optional: remove parsed data after use
+
+    # Force garbage collection
+    gc.collect()
 
     return self.competitions
 

@@ -7,6 +7,9 @@ from collections import OrderedDict
 # Write your code here :-)
 class SportsDisplay:
     def __init__(self, display, sport, league):
+        # Reference to Display
+        self.display = display
+
         # Load the Tom Thumb font
         self.small_font = bitmap_font.load_font("/fonts/04B_03__6pt.pcf")
         self.smaller_font = bitmap_font.load_font("/fonts/04B_03__5pt.pcf")
@@ -204,6 +207,9 @@ class SportsDisplay:
     def update(self, competition):
         print("Updating Display!")
 
+        # Display Auto Refresh while Display is Updating
+        self.display.auto_refresh = False
+
         # Clear the Display Group
         while len(self.main_group) > 0:
             self.main_group.pop()
@@ -295,5 +301,8 @@ class SportsDisplay:
         self.game_status.hidden = (competition.state == "pre")
         self.away_team_record.hidden = (competition.state == "in")
         self.home_team_record.hidden = (competition.state == "in")
+
+        # Reenable Auto Refresh after Display Updates
+        self.display.auto_refresh = True
 
         return
