@@ -4,6 +4,7 @@ import wifi
 import ssl
 import time
 import gc
+import json
 from competition import Competition
 from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
 
@@ -23,7 +24,7 @@ class FetchData:
     wifi.radio.connect(secrets["ssid"], secrets["password"])
     self.pool = socketpool.SocketPool(wifi.radio)
     self.requests = adafruit_requests.Session(self.pool, ssl.create_default_context())
-    self.https = adafruit_requests.Session(self.pool, ssl.create_default_context())
+    #self.https = adafruit_requests.Session(self.pool, ssl.create_default_context())
 
     # Connect to Adafruit IO
     self.aio = IO_HTTP(secrets["aio_username"], secrets["aio_key"], self.requests)
@@ -41,15 +42,36 @@ class FetchData:
     # Adafruit IO URL
     self.url = f"https://io.adafruit.com/api/v2/{secrets['aio_username']}/feeds/{feed_key}"
 
-   def update_scoreboard_config(self, i):
+    # Computer IP
+    self.host_ip = "10.0.0.218"
+
+    '''
+    # Replace with your computer's IP address
+    url = "http://%s:6000/receive" % self.host_ip
+    data = {
+        "device": "matrix_portal_s3",
+        "message": "Hello from Matrix Portal!",
+        "value": 42
+    }
+
+    print("Sending data...")
+    response = self.requests.post(url, json=data)
+    print("Response:", response.text)
+    '''
+
+   def update_scoreboard_config(self, i, matrixportal):
+    print("Updating Scoreboard Config")
+
     # Update the Scoreboard Configuration
     response = self.aio._get(self.url)
+
     if response != self.last_response:
         self.sport = response['last_value'].split("/")[0]
         self.league = response['last_value'].split("/")[1]
 
         # Reset Display Index
         i = 0
+
 
     # Last Pass Response
     self.last_response = response
@@ -63,7 +85,7 @@ class FetchData:
    def fetch_data(self):
     # ESPN API endpoint for NFL scoreboard
     url = "https://site.api.espn.com/apis/site/v2/sports/%s/%s/scoreboard" % (self.sport, self.league)
-    response = self.https.get(url)
+    response = self.requests.get(url)
     data = response.json()
 
     # Clean Up Response Data
@@ -171,9 +193,6 @@ class FetchData:
     # Clean Up Parsed Data Object
     del data          # Optional: remove parsed data after use
 
-    # Force garbage collection
-    gc.collect()
-
     return self.competitions
 
    def clear_data(self):
@@ -200,5 +219,81 @@ class FetchData:
          return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
       except ValueError:
          return (255, 255, 255)
+
+   def update_game_data(self):
+        competitions = []
+
+        '''
+        url = f"https://io.adafruit.com/api/v2/{secrets['aio_username']}/feeds/scores"
+
+
+        response = self.aio._get(url)
+        data = json.loads(response["last_value"])
+
+        for game in data:
+            print(game['home_team'])
+        '''
+
+        url = "http://%s:8000/data.txt" % self.host_ip  # Replace with your Mac's IP
+        data = json.loads(self.requests.get(url).text)
+
+        for game in data:
+            # Create a New Compeition Instance
+            competition = Competition()
+
+            competition.state = game['status']
+            competition.shortDetail = game['shortDetail']
+            competition.away_team.abbr = game['away']
+            competition.away_team.score = str(game['away_score'])
+            competition.away_team.rank = game['away_rank'] or ""
+            competition.away_team.record = game['away_record']
+            competition.home_team.abbr = game['home']
+            competition.home_team.score = str(game['home_score'])
+            competition.home_team.rank = game['home_rank'] or ""
+            competition.home_team.record = game['home_record']
+            situation = game.get('situation')
+
+            # Set the Game Date and Time
+            if competition.state == "pre":
+                # Competition Date
+                competition.date = competition.shortDetail.split(" - ")[0]
+
+                # Convert UTC ISO8601 timestamp manually
+                iso_time = game["game_date"]  # e.g. '2024-09-01T17:25Z'
+                utc_struct = self.parse_iso8601(iso_time)
+                utc_seconds = time.mktime(utc_struct)
+
+                # ✅ Convert to local using tz_offset from NTP
+                local_seconds = utc_seconds + (-5 * 3600)
+                local_struct = time.localtime(local_seconds)
+
+                # Format display
+                competition.time = "{}:{:02} {}".format(
+                    local_struct.tm_hour % 12 or 12,
+                    local_struct.tm_min,
+                    "AM" if local_struct.tm_hour < 12 else "PM"
+                )
+
+            elif competition.state == "in":
+                # Set the Current Inning
+                if self.sport == "baseball":
+                    # Inning
+                    competition.inning = competition.shortDetail.split()[1]
+
+                    # Outs
+                    competition.outs = str(game.get('situation').get('outs')) + " Out"
+
+                # Base Status
+                competition.on_first = game.get('situation').get("onFirst")
+                competition.on_second = game.get('situation').get("onSecond")
+                competition.on_third = game.get('situation').get("onThird")
+            elif self.sport == "football":
+                #TODO
+                pass
+
+            competitions.append(competition)
+
+        return competitions
+
 
 

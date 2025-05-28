@@ -14,51 +14,54 @@ class SportsDisplay:
         self.small_font = bitmap_font.load_font("/fonts/04B_03__6pt.pcf")
         self.smaller_font = bitmap_font.load_font("/fonts/04B_03__5pt.pcf")
 
+        # Preload ASCII glyphs into cache (space to tilde)
+        self.small_font.load_glyphs(b"".join([bytes([i]) for i in range(32, 127)]))
+        self.smaller_font.load_glyphs(b"".join([bytes([i]) for i in range(32, 127)]))
+
         # Sport and League
         self.sport = sport
         self.league = league
 
         # Display Group
-        self.main_group = displayio.Group()
-        display.root_group = self.main_group
+        self.display_group = displayio.Group(x=196, y=0)
 
         # Logo groups
         self.away_team_logo = displayio.Group(scale=1, x=0, y=0)
-        self.main_group.append(self.away_team_logo)
         self.home_team_logo = displayio.Group(scale=1, x=96, y=0)
-        self.main_group.append(self.home_team_logo)
+        self.display_group.append(self.away_team_logo)
+        self.display_group.append(self.home_team_logo)
 
         # Team Abbreviations
         self.away_team_abbr = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=34, y=5)
-        self.main_group.append(self.away_team_abbr)
         self.home_team_abbr = label.Label(terminalio.FONT, text="", color=0xFFFFFF, x=66, y=5)
-        self.main_group.append(self.home_team_abbr)
+        self.display_group.append(self.away_team_abbr)
+        self.display_group.append(self.home_team_abbr)
 
         # Team Ranks
         self.away_team_rank = label.Label(self.small_font, text="", color=0xFFFFFF, x=32, y=22)
-        self.main_group.append(self.away_team_rank)
         self.home_team_rank = label.Label(self.small_font, text="", color=0xFFFFFF, x=84, y=22)
-        self.main_group.append(self.home_team_rank)
+        self.display_group.append(self.away_team_rank)
+        self.display_group.append(self.home_team_rank)
 
         # Team Record
         self.away_team_record = label.Label(self.small_font, text="", color=0xFFFFFF, x=36, y=28)
-        self.main_group.append(self.away_team_record)
         self.home_team_record = label.Label(self.small_font, text="", color=0xFFFFFF, x=36, y=28)
-        self.main_group.append(self.home_team_record)
+        self.display_group.append(self.away_team_record)
+        self.display_group.append(self.home_team_record)
 
         # Scores
         self.away_score = label.Label(terminalio.FONT, text="", color=0xFFFF00, x=36, y=14)
-        self.main_group.append(self.away_score)
         self.home_score = label.Label(terminalio.FONT, text="", color=0xFFFF00, x=64, y=14)
-        self.main_group.append(self.home_score)
+        self.display_group.append(self.away_score)
+        self.display_group.append(self.home_score)
 
         # Game Date and Time
         self.game_date = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=8)
-        self.main_group.append(self.game_date)
         self.game_time = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=14)
-        self.main_group.append(self.game_time)
         self.game_status = label.Label(self.small_font, text="", color=0xFFFFFF, x=48, y=14)
-        self.main_group.append(self.game_status)
+        self.display_group.append(self.game_date)
+        self.display_group.append(self.game_time)
+        self.display_group.append(self.game_status)
 
         # Baseball Game Status
         self.inning = label.Label(self.small_font, text="", color=0xFFFF00, x=48, y=19)
@@ -67,6 +70,15 @@ class SportsDisplay:
         self.first_base = displayio.Group(scale=1, x=66, y=9)
         self.second_base = displayio.Group(scale=1, x=60, y=3)
         self.third_base = displayio.Group(scale=1, x=54, y=9)
+
+        # Append Baseball Labels
+        if self.sport == "baseball":
+            self.display_group.append(self.inning)
+            self.display_group.append(self.inning_logo)
+            self.display_group.append(self.outs)
+            self.display_group.append(self.first_base)
+            self.display_group.append(self.second_base)
+            self.display_group.append(self.third_base)
 
         # Ordered Dictionary for Bases Loaded State
         self.bases_image_dict = OrderedDict()
@@ -77,7 +89,12 @@ class SportsDisplay:
         self.football_field = displayio.Group(scale=1, x=32, y=24)
         self.football = displayio.Group(scale=1, x=96, y=27)
         self.yard_line = label.Label(self.smaller_font, text="", color=0xFFFFFF, x=0, y=25)
-        self.main_group.append(self.yard_line)
+
+        # Append Football Labels
+        if self.sport == "football":
+            self.display_group.append(self.football)
+            self.display_group.append(self.football_field)
+            self.display_group.append(self.yard_line)
 
     # Load a 32x32 BMP logo
     def load_logo(self, group, logo, abbr, x=0, y=0):
@@ -90,7 +107,7 @@ class SportsDisplay:
             tile_grid.x = x
             tile_grid.y = y
             logo.append(tile_grid)
-            group.append(logo)
+            #group.append(logo)
         except Exception as e:
             print(f"Logo error for {abbr}: {e}")
 
@@ -105,7 +122,7 @@ class SportsDisplay:
         except Exception as e:
             print(f"Logo error for {filename}: {e}")
 
-        self.main_group.append(image)
+        #self.main_group.append(image)
 
     def center_text(self, label, text, min_x, max_x):
         '''
@@ -119,10 +136,8 @@ class SportsDisplay:
         '''
 
         label.text = text
-        x, y, width, height = label.bounding_box
+        width = label.bounding_box[2]
         label.x = min_x + (max_x - min_x - width) // 2
-
-        self.main_group.append(label)
 
         return
 
@@ -208,15 +223,17 @@ class SportsDisplay:
         print("Updating Display!")
 
         # Display Auto Refresh while Display is Updating
-        self.display.auto_refresh = False
+        #self.display.auto_refresh = False
 
+        '''
         # Clear the Display Group
-        while len(self.main_group) > 0:
-            self.main_group.pop()
+        while len(self.display_group) > 0:
+            self.display_group.pop()
+        '''
 
         # Update Team Logos
-        self.load_logo(self.main_group, self.away_team_logo, competition.away_team.abbr)
-        self.load_logo(self.main_group, self.home_team_logo, competition.home_team.abbr)
+        self.load_logo(self.display_group, self.away_team_logo, competition.away_team.abbr)
+        self.load_logo(self.display_group, self.home_team_logo, competition.home_team.abbr)
 
         # Update Team Abbreviations
         self.center_text(self.away_team_abbr, competition.away_team.abbr, 34, 50)
@@ -228,7 +245,6 @@ class SportsDisplay:
             self.center_text(self.home_score, competition.home_team.score, 78, 94)
 
         # Pre-Game Information
-        #competition.state = "in"
         if competition.state == "pre":
             self.center_text(self.game_date, competition.date, 32, 96)
             self.center_text(self.game_time, competition.time, 32, 96)
@@ -236,6 +252,7 @@ class SportsDisplay:
             self.center_text(self.home_team_record, competition.home_team.record, 64, 96)
             self.center_text(self.away_team_rank, competition.away_team.rank, 32, 64)
             self.center_text(self.home_team_rank, competition.home_team.rank, 64, 96)
+        # Post Game Information
         elif competition.state == "post":
             self.center_text(self.game_status, "Final", 32, 96)
             self.center_text(self.away_team_record, competition.away_team.record, 32, 64)
@@ -245,7 +262,7 @@ class SportsDisplay:
         elif competition.state == "in":
             if self.sport == "baseball":
                 self.inning.text = competition.inning
-                if competition.shortDetail.find("Top"):
+                if competition.shortDetail.find("Top") > -1:
                     self.load_image(self.inning_logo, "images/top.bmp")
                     self.inning_logo.y = 18
                     self.center_text(self.outs, competition.outs, 32, 64)
@@ -253,13 +270,14 @@ class SportsDisplay:
                     self.load_image(self.inning_logo, "images/bottom.bmp")
                     self.inning_logo.y = 15
                     self.center_text(self.outs, competition.outs, 64, 96)
+
                 self.inning_logo.x = self.center_label_and_image(self.inning, 7, 32, 96, spacing=1)
 
                 self.load_image(self.first_base, self.bases_image_dict[competition.on_first])
                 self.load_image(self.second_base, self.bases_image_dict[competition.on_second])
                 self.load_image(self.third_base, self.bases_image_dict[competition.on_third])
 
-                self.main_group.append(self.inning)
+                #self.game1_group.append(self.inning)
             elif self.sport == "football":
                 if competition.yard_line:
                     yardline = self.yardline_to_field_position(competition.yard_line,
@@ -284,6 +302,11 @@ class SportsDisplay:
         self.home_score.hidden = (competition.state == "pre")
         self.game_date.hidden = (competition.state != "pre")
         self.game_time.hidden = (competition.state != "pre")
+        self.home_team_rank.hidden = (competition.state == "in")
+        self.away_team_rank.hidden = (competition.state == "in")
+        self.game_status.hidden = (competition.state == "pre") or (competition.state == "in")
+        self.away_team_record.hidden = (competition.state == "in")
+        self.home_team_record.hidden = (competition.state == "in")
 
         # Sport Specific Icons
         if self.sport == "baseball":
@@ -296,13 +319,16 @@ class SportsDisplay:
         elif self.sport == "football":
             pass
 
-        self.home_team_rank.hidden = (competition.state == "in")
-        self.away_team_rank.hidden = (competition.state == "in")
-        self.game_status.hidden = (competition.state == "pre")
-        self.away_team_record.hidden = (competition.state == "in")
-        self.home_team_record.hidden = (competition.state == "in")
+        '''
+        # Add or Remove Elements Based on Game State
+        if competition.state == "in" or competition.state == "post":
+            if self.away_score not in self.display_group: self.display_group.append(self.away_score)
+            if self.home_score not in self.display_group: self.display_group.append(self.home_score)
+        else:
+            if self.away_score in self.display_group: self.display_group.remove(self.away_score)
+            if self.home_score in self.display_group: self.display_group.remove(self.home_score)
+        '''
 
-        # Reenable Auto Refresh after Display Updates
-        self.display.auto_refresh = True
+        print("Finished Updating Display!")
 
         return
