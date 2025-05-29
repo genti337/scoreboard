@@ -5,6 +5,7 @@ import ssl
 import time
 import gc
 import json
+import adafruit_httpserver
 from competition import Competition
 from adafruit_io.adafruit_io import IO_HTTP, AdafruitIO_RequestError
 
@@ -43,21 +44,33 @@ class FetchData:
     self.url = f"https://io.adafruit.com/api/v2/{secrets['aio_username']}/feeds/{feed_key}"
 
     # Computer IP
-    self.host_ip = "10.0.0.218"
+    self.host_ip = "10.0.0.26"
+
+    # Game Data
+    self.game_data = None
 
     '''
-    # Replace with your computer's IP address
-    url = "http://%s:6000/receive" % self.host_ip
-    data = {
-        "device": "matrix_portal_s3",
-        "message": "Hello from Matrix Portal!",
-        "value": 42
-    }
+    # Server to Receive Data
+    self.server = adafruit_httpserver.Server(self.pool, "/static", debug=True)
 
-    print("Sending data...")
-    response = self.requests.post(url, json=data)
-    print("Response:", response.text)
-    '''
+    # Start the server
+    self.server.start(str(wifi.radio.ipv4_address))
+    print("🌐 Listening at http://%s:80/send" % wifi.radio.ipv4_address)
+
+
+    @self.server.route("/send", methods=["POST"])
+    def receive_json(request: adafruit_httpserver.Request):
+        global last_data
+        try:
+            content_length = int(request.headers.get("Content-Length", 0))
+            body = request.body.read(content_length)
+            last_data = json.loads(body)
+            print("📥 Received JSON:", last_data)
+            return adafruit_httpserver.Response(request, "JSON received", content_type="text/plain")
+        except Exception as e:
+            print("❌ Error parsing JSON:", e)
+            return adafruit_httpserver.Response(request, "Bad Request", status=400)
+   '''
 
    def update_scoreboard_config(self, i, matrixportal):
     print("Updating Scoreboard Config")
@@ -142,7 +155,6 @@ class FetchData:
                     pass
 
         # Set the Game Date and Time
-        #competition.state = 'in'
         if competition.state == "pre":
             # Competition Date
             competition.date = competition.shortDetail.split(" - ")[0]
@@ -223,19 +235,12 @@ class FetchData:
    def update_game_data(self):
         competitions = []
 
-        '''
-        url = f"https://io.adafruit.com/api/v2/{secrets['aio_username']}/feeds/scores"
+        url = "http://%s:8000/%s.txt" % (self.host_ip, self.league)  # Replace with your Mac's IP
 
-
-        response = self.aio._get(url)
-        data = json.loads(response["last_value"])
-
-        for game in data:
-            print(game['home_team'])
-        '''
-
-        url = "http://%s:8000/data.txt" % self.host_ip  # Replace with your Mac's IP
-        data = json.loads(self.requests.get(url).text)
+        #data = json.loads(self.requests.get(url).text)
+        raw_bytes = self.requests.get(url).content
+        text = raw_bytes.decode("utf-8")
+        data = json.loads(text)
 
         for game in data:
             # Create a New Compeition Instance
@@ -294,6 +299,27 @@ class FetchData:
             competitions.append(competition)
 
         return competitions
+
+   def read_game_data(self):
+        # Download in chunks (like 512 bytes)
+        CHUNK_SIZE = 512
+
+        url = "http://%s:8000/game.txt" % (self.host_ip)  # Replace with your Mac's IP
+
+        self.game_data = self.requests.get(url)
+        raw_bytes = self.game_data.content
+        text = raw_bytes.decode("utf-8")
+
+        data = json.loads(text)
+        #print(data[0])
+
+        #print(text)
+
+        #game_data_text = self.game_data.text
+
+
+
+
 
 
 

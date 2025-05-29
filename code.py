@@ -58,70 +58,53 @@ display.root_group = main_group
 
 main_group.append(game1_display.display_group)
 main_group.append(game2_display.display_group)
-#main_group.append(game3_display.display_group)
 
+# Main Loop
+first_pass = True
 
-print("IP address:", wifi.radio.ipv4_address)
+i = 1
+while True:
 
-async def fetch_game_data():
-    while True:
-        print("Fetching Data!")
+    # Initialize Competitions
+    if first_pass:
+        sport, league, i = fetch_data_obj.update_scoreboard_config(i, matrix)
+        game1_display.sport = game2_display.sport = sport
+        game1_display.league = game2_display.league = league
 
-        await asyncio.sleep(refresh_rate)
+        competitions = fetch_data_obj.fetch_data()
+        game1_display.update(competitions[0])
+        game2_display.update(competitions[1])
+        last_update_time_seconds = time.monotonic()
 
+        game1_display.display_group.x = 0
+        game2_display.display_group.x = 0 + 128 + 32
+
+        i = 1
+
+    if game1_display.display_group.x < -128:
+        i = i + 1 if i < len(competitions)-1 else 0
+        game1_display.update(competitions[i])
+        game1_display.display_group.x = game2_display.display_group.x + 128 + 32
+    elif game2_display.display_group.x < -128:
+        i = i + 1 if i < len(competitions)-1 else 0
+        game2_display.update(competitions[i])
+        game2_display.display_group.x = game1_display.display_group.x + 128 + 32
+
+    # Update Competition Data
+    if (time.monotonic() - last_update_time_seconds) > refresh_rate:
+        print("Refreshing data!")
+        # Update the Scoreboard Configuration
         competitions = fetch_data_obj.update_game_data()
+        #fetch_data_obj.read_game_data()
+        print("Finished refreshing data!")
+        last_update_time_seconds = time.monotonic()
 
-async def update_display():
-    first_pass = True
-    refresh_data = True
+    game1_display.display_group.x -= 1
+    game2_display.display_group.x -= 1
+    display.refresh()
 
-    i = 1
-    while True:
+    # Sleep
+    time.sleep(0.05)
 
-        # Initialize Competitions
-        if first_pass:
-            game1_display.sport, game1_display.league, i = fetch_data_obj.update_scoreboard_config(i, matrix)
-            competitions = fetch_data_obj.fetch_data()
-            game1_display.update(competitions[0])
-            game2_display.update(competitions[1])
-            last_update_time_seconds = time.monotonic()
-
-            game1_display.display_group.x = 0
-            game2_display.display_group.x = 0 + 128 + 32
-
-            i = 1
-
-        if game1_display.display_group.x < -128:
-            i = i + 1 if i < len(competitions)-1 else 0
-            game1_display.update(competitions[i])
-            game1_display.display_group.x = game2_display.display_group.x + 128 + 32
-            refresh_data = True
-        elif game2_display.display_group.x < -128:
-            i = i + 1 if i < len(competitions)-1 else 0
-            game2_display.update(competitions[i])
-            game2_display.display_group.x = game1_display.display_group.x + 128 + 32
-            refresh_data = True
-
-        # Update Competition Data
-        if (time.monotonic() - last_update_time_seconds) > refresh_rate:
-            print("Refreshing data!")
-            # Update the Scoreboard Configuration
-            competitions = fetch_data_obj.update_game_data()
-            print("Finished refreshing data!")
-            refresh_data = False
-            last_update_time_seconds = time.monotonic()
-
-        game1_display.display_group.x -= 1
-        game2_display.display_group.x -= 1
-        display.refresh()
-
-        # Sleep
-        await asyncio.sleep(0.05)
-
-        # Reset the First Pass Flag
-        first_pass = False
-
-async def main():
-    await asyncio.gather(update_display())
-
-asyncio.run(main())
+    # Reset the First Pass Flag
+    first_pass = False

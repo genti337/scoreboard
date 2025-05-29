@@ -220,7 +220,7 @@ class SportsDisplay:
         return x
 
     def update(self, competition):
-        print("Updating Display!")
+        #print("Updating Display!")
 
         # Display Auto Refresh while Display is Updating
         #self.display.auto_refresh = False
@@ -329,6 +329,6 @@ class SportsDisplay:
             if self.home_score in self.display_group: self.display_group.remove(self.home_score)
         '''
 
-        print("Finished Updating Display!")
+        #print("Finished Updating Display!")
 
         return

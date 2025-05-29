@@ -14,8 +14,8 @@ DATA_INTERVAL = 60               # Seconds between ESPN updates when online
 # ESPN API URL
 #ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
 #ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/scoreboard"
-SPORT = "baseball"
-LEAGUE = "mlb"
+SPORTS = ["baseball", "baseball"]
+LEAGUES = ["mlb", "college-baseball"]
 
 # Output folder and data file
 FOLDER = os.path.expanduser("~/matrix_data")
@@ -87,9 +87,10 @@ def get_game_data(sport, league):
 
 def write_data(sport, league):
     game_data = get_game_data(sport, league)
+    DATA_FILE = os.path.join(FOLDER, "%s.txt" % (league))
     with open(DATA_FILE, "w") as f:
         json.dump(game_data, f, indent=2)
-    print("✅ Updated data.txt")
+    print("✅ Updated %s.txt" % (league))
 
 def serve_http():
     os.chdir(FOLDER)
@@ -111,7 +112,10 @@ def main_loop():
             online = False
 
         if online and (time.time() - last_update) >= DATA_INTERVAL:
-            write_data(SPORT, LEAGUE)
+            i = 0
+            while i < len(SPORTS):
+               write_data(SPORTS[i], LEAGUES[i])
+               i = i + 1
             last_update = time.time()
 
         time.sleep(CHECK_INTERVAL)
