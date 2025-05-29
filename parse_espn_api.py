@@ -12,7 +12,10 @@ CHECK_INTERVAL = 1               # Seconds between ping checks
 DATA_INTERVAL = 60               # Seconds between ESPN updates when online
 
 # ESPN API URL
-ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+#ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
+#ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/scoreboard"
+SPORT = "baseball"
+LEAGUE = "mlb"
 
 # Output folder and data file
 FOLDER = os.path.expanduser("~/matrix_data")
@@ -25,21 +28,23 @@ def ping_device(ip_address, count=1):
 
     return os.system(' '.join(command)) == 0
 
-def extract_record(team):
-    records = team.get("records", [])
+def extract_record(competitor):
+    records = competitor.get("records", [])
     for rec in records:
         if rec.get("type") == "total":
             return rec.get("summary", "")
     return ""
 
-def get_game_data():
+def get_game_data(sport, league):
     try:
+        ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/%s/%s/scoreboard" % (sport, league)
         response = requests.get(ESPN_URL)
         data = response.json()
 
         output = []
         for event in data.get("events", []):
             comp = event["competitions"][0]
+            competitors = comp.get("competitors", [])
             status_info = comp["status"]
             short_detail = status_info["type"].get("shortDetail", "")
             game_state = status_info["type"].get("state", "unknown").lower()
@@ -51,12 +56,12 @@ def get_game_data():
             game = {
                 "away": away["team"]["abbreviation"],
                 "away_score": int(away["score"]),
-                "away_record": extract_record(away["team"]),
+                "away_record": extract_record(competitors[0]),
                 "away_rank": away["team"].get("rank"),
 
                 "home": home["team"]["abbreviation"],
                 "home_score": int(home["score"]),
-                "home_record": extract_record(home["team"]),
+                "home_record": extract_record(competitors[1]),
                 "home_rank": home["team"].get("rank"),
 
                 "shortDetail": short_detail,
@@ -80,8 +85,8 @@ def get_game_data():
     except Exception as e:
         return [{"error": str(e)}]
 
-def write_data():
-    game_data = get_game_data()
+def write_data(sport, league):
+    game_data = get_game_data(sport, league)
     with open(DATA_FILE, "w") as f:
         json.dump(game_data, f, indent=2)
     print("✅ Updated data.txt")
@@ -106,7 +111,7 @@ def main_loop():
             online = False
 
         if online and (time.time() - last_update) >= DATA_INTERVAL:
-            write_data()
+            write_data(SPORT, LEAGUE)
             last_update = time.time()
 
         time.sleep(CHECK_INTERVAL)
