@@ -13,22 +13,26 @@ ESPNParser::~ESPNParser() {
 }
 
 // ESPN Scoreboard Parser
-void ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
+std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
+    std::vector<Competition> competitions;
+
     struct json_object* root = json_tokener_parse(jsonStr.c_str());
     if (!root) {
         std::cerr << "Failed to parse JSON.\n";
-        return;
+        return competitions;
     }
 
     struct json_object* events;
     if (!json_object_object_get_ex(root, "events", &events) || !json_object_is_type(events, json_type_array)) {
         std::cerr << "No 'events' array found.\n";
         json_object_put(root);
-        return;
+        return competitions;
     }
 
     int len = json_object_array_length(events);
     for (int i = 0; i < len; ++i) {
+        Competition competition;
+
         struct json_object* event = json_object_array_get_idx(events, i);
         struct json_object* comps;
 
@@ -64,9 +68,13 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
             }
         }
 
-        std::cout << awayAbbr << " " << awayScore << " @ " << homeAbbr << " " << homeScore << "\n";
+        //FIXME std::cout << awayAbbr << " " << awayScore << " @ " << homeAbbr << " " << homeScore << "\n";
+
+        competitions.push_back(competition);
     }
 
     json_object_put(root);  // clean up
+
+    return competitions;
 
 }

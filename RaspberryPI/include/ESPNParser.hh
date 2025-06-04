@@ -4,13 +4,14 @@
 #include <string>
 #include <vector>
 #include <curl/curl.h>
+#include "../include/Competition.hh"
 
 class ESPNParser {
 public:
     ESPNParser();
     ~ESPNParser();
 
-    void parseESPNScoreboard(const std::string& jsonStr);
+    std::vector<Competition> parseESPNScoreboard(const std::string& jsonStr);
 
 private:
 

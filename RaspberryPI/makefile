@@ -1,5 +1,5 @@
 TARGET = espn_jsonc
-SRC = src/main.cpp src/FetchData.cpp src/ESPNParser.cpp
+SRC = src/main.cpp src/FetchData.cpp src/ESPNParser.cpp src/Team.cpp src/Competition.cpp
 
 # Default compiler and flags
 CXX = g++
