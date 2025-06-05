@@ -6,7 +6,7 @@
 
 class FetchData {
 public:
-    FetchData(const std::string& url);
+    FetchData(const std::string& sport, const std::string& league);
     ~FetchData();
 
     std::string fetch();

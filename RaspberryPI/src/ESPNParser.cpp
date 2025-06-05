@@ -1,6 +1,9 @@
 #include "../include/ESPNParser.hh"
 #include <iostream>
 #include <json-c/json.h>
+#include "../include/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 // Constructor
 ESPNParser::ESPNParser() {
@@ -16,64 +19,40 @@ ESPNParser::~ESPNParser() {
 std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
     std::vector<Competition> competitions;
 
-    struct json_object* root = json_tokener_parse(jsonStr.c_str());
-    if (!root) {
-        std::cerr << "Failed to parse JSON.\n";
-        return competitions;
-    }
+    json j = json::parse(jsonStr);
 
-    struct json_object* events;
-    if (!json_object_object_get_ex(root, "events", &events) || !json_object_is_type(events, json_type_array)) {
-        std::cerr << "No 'events' array found.\n";
-        json_object_put(root);
-        return competitions;
-    }
+    if (!j.contains("events")) return competitions;
 
-    int len = json_object_array_length(events);
-    for (int i = 0; i < len; ++i) {
-        Competition competition;
+    try {
+        for (const auto& event : j["events"]) {
+            Competition game;
 
-        struct json_object* event = json_object_array_get_idx(events, i);
-        struct json_object* comps;
+            const auto& comp = event["competitions"][0];
+            const auto& competitors = comp["competitors"];
 
-        if (!json_object_object_get_ex(event, "competitions", &comps)) continue;
-        struct json_object* comp = json_object_array_get_idx(comps, 0);
+            game.state = comp["status"]["type"]["state"].get<std::string>();
+            game.shortDetail = comp["status"]["type"]["shortDetail"].get<std::string>();
+//FIXME            game.period = comp["status"]["period"].get<std::string>();
+//FIXME            game.clock = comp["status"]["displayClock"].get<std::string>();
 
-        struct json_object* competitors;
-        if (!json_object_object_get_ex(comp, "competitors", &competitors)) continue;
+            for (const auto& team : competitors) {
+                bool is_home = (team["homeAway"] == "home");
 
-        std::string homeAbbr, awayAbbr, homeScore, awayScore;
+                if (is_home) {
+                   game.HomeTeam.abbr = team["team"]["abbreviation"];
+                   game.HomeTeam.score = team["score"];
+                } else {
+                   game.AwayTeam.abbr = team["team"]["abbreviation"];
+                   game.AwayTeam.score = team["score"];
+                }
 
-        for (int j = 0; j < json_object_array_length(competitors); ++j) {
-            struct json_object* teamObj = json_object_array_get_idx(competitors, j);
-            struct json_object *team, *score, *homeAway;
-
-            json_object_object_get_ex(teamObj, "team", &team);
-            json_object_object_get_ex(teamObj, "score", &score);
-            json_object_object_get_ex(teamObj, "homeAway", &homeAway);
-
-            struct json_object* abbr;
-            json_object_object_get_ex(team, "abbreviation", &abbr);
-
-            std::string side = json_object_get_string(homeAway);
-            std::string abbrStr = json_object_get_string(abbr);
-            std::string scoreStr = json_object_get_string(score);
-
-            if (side == "home") {
-                homeAbbr = abbrStr;
-                homeScore = scoreStr;
-            } else {
-                awayAbbr = abbrStr;
-                awayScore = scoreStr;
             }
+
+            competitions.push_back(game);
         }
-
-        //FIXME std::cout << awayAbbr << " " << awayScore << " @ " << homeAbbr << " " << homeScore << "\n";
-
-        competitions.push_back(competition);
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
     }
-
-    json_object_put(root);  // clean up
 
     return competitions;
 

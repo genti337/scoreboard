@@ -6,20 +6,23 @@
 #include <thread>
 #include <atomic>
 
-void fetch_loop(std::atomic<bool>& running) {
-    int frame = 0;
+void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
 
     while (running) {
-        FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
+        //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
+        FetchData fetcher("baseball", "mlb");
         std::string data = fetcher.fetch();
 
-        ESPNParser parser;
-
         if (!data.empty()) {
-            std::vector<Competition> competitions;
-            competitions = parser.parseESPNScoreboard(data);
+            if (competition_index <= 0) {
+                competition_index = 1;
+                competitions1 = parser.parseESPNScoreboard(data);
+            } else {
+                competitions2 = parser.parseESPNScoreboard(data);
+                competition_index = 0;
+            }
 
-            std::cout << "Length of competitions: " << competitions.size() << std::endl;
+            std::cout << "Length of competitions: " << competitions2.size() << std::endl;
 
         } else {
             std::cerr << "No data received.\n";
@@ -31,10 +34,16 @@ void fetch_loop(std::atomic<bool>& running) {
     return;
 }
 
-void display_loop(std::atomic<bool>& running) {
+void display_loop(std::atomic<bool>& running, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
 
     while (running) {
-        printf("Updating Display\n");
+        if (competition_index == 0) {
+           printf("Updating Competition 1\n");
+        } else if (competition_index == 1) {
+           printf("Updating Competition 2\n");
+        } else {
+           printf("%i\n", competition_index);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));  // Fast update
     }
 
@@ -42,11 +51,25 @@ void display_loop(std::atomic<bool>& running) {
 }
 
 int main() {
+    ESPNParser parser;   // ESPN Parser Class
+    int competition_index = -99;
+    std::vector<Competition> competitions1;
+    std::vector<Competition> competitions2;
+
     std::atomic<bool> running(true);
 
 
-    std::thread displayThread(display_loop, std::ref(running));
-    std::thread fetchThread(fetch_loop, std::ref(running));
+    std::thread displayThread(display_loop,
+                              std::ref(running),
+                              std::ref(competition_index),
+                              std::ref(competitions1),
+                              std::ref(competitions2));
+    std::thread fetchThread(fetch_loop,
+                            std::ref(running),
+                            std::ref(parser),
+                            std::ref(competition_index),
+                            std::ref(competitions1),
+                            std::ref(competitions2));
 
     std::cout << "Press Enter to stop..." << std::endl;
     std::cin.get();  // Wait for user input
@@ -57,6 +80,11 @@ int main() {
     fetchThread.join();
 
     std::cout << "All threads stopped." << std::endl;
+
+
+    std::cout << "Competition Index: " << competition_index << std::endl;
+    std::cout << "Length of competitions1: " << competitions1.size() << std::endl;
+    std::cout << "Length of competitions2: " << competitions2.size() << std::endl;
 
     return 0;
 }
