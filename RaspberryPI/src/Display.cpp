@@ -55,24 +55,34 @@ void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
     DrawText(canvas, font, x, y, rgb_matrix::Color(0, 0, 0), nullptr, text.c_str());
 }
 
-void Display::drawImage(const std::string& path) {
+void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
     InitializeMagick(nullptr);
 
-    Image image;
+    Magick::Image image;
     image.read(path);
-    image.resize(Geometry(canvas->width(), canvas->height()));
-    image.flip();  // optional
-    image.modifyImage();
+    //image.flip();              // Optional: Flip vertically
+    image.modifyImage();       // Allow pixel access
 
     for (size_t y = 0; y < image.rows(); ++y) {
         for (size_t x = 0; x < image.columns(); ++x) {
-            ColorRGB color = image.pixelColor(x, y);
-            canvas->SetPixel(x, y, color.red() * 255, color.green() * 255, color.blue() * 255);
+            Magick::ColorRGB color = image.pixelColor(x, y);
+
+            int draw_x = static_cast<int>(x) + offset_x;
+            int draw_y = static_cast<int>(y) + offset_y;
+
+            // Optional: skip out-of-bounds pixels
+            if (draw_x >= 0 && draw_x < canvas->width() &&
+                draw_y >= 0 && draw_y < canvas->height()) {
+                canvas->SetPixel(draw_x, draw_y,
+                                 static_cast<uint8_t>(color.red() * 255),
+                                 static_cast<uint8_t>(color.green() * 255),
+                                 static_cast<uint8_t>(color.blue() * 255));
+            }
         }
     }
 }
 
-void Display::render(Competition competition) {
+void Display::render(Competition competition, const std::string& images_dir) {
     // Clear the Canvas for Update
     canvas->Clear();
 
@@ -80,8 +90,14 @@ void Display::render(Competition competition) {
     center_text(font, competition.AwayTeam.abbr, 34, 50, 5);
     center_text(font, competition.HomeTeam.abbr, 78, 94, 5);
 
+    // Team Logos
+    oss.clear();
+    oss << images_dir << competition.AwayTeam.abbr << ".bmp";
+    drawImage(oss.str());
+    oss.clear();
+    oss << images_dir << competition.HomeTeam.abbr << ".bmp";
+    drawImage(oss.str());
 
-    // Team Scores
     if (competition.state == "pre") {
 
     } else if (competition.state == "in") {

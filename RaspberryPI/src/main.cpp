@@ -43,10 +43,10 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
 
         if (competition_index == 0) {
            printf("Updating Competition 1\n");
-	   display.render(competitions2[0]);
+	   display.render(competitions2[0], "../images/mlb/");
         } else if (competition_index == 1) {
            printf("Updating Competition 2\n");
-	   display.render(competitions1[0]);
+	   display.render(competitions1[0], "../images/mlb/");
         } else {
            printf("%i\n", competition_index);
         }
