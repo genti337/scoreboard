@@ -20,7 +20,7 @@ from PIL import Image, ImageOps, ImageEnhance
 sport_names = ["baseball"]
 # the name of the corresponding leages you want to follow
 #sport_leagues = ["nfl", "mlb", "usa.1", "nhl", "nba"]
-sport_leagues = ["college-baseball"]
+sport_leagues = ["mlb"]
 # directory to match CircuitPython code folder names
 bitmap_directories = ["college-baseball"]
 
@@ -121,7 +121,7 @@ def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
 #    img.save(filename.split('.')[0] + '.bmp')
 
 # Create a base directory to store the logos if it doesn't exist
-base_dir = 'images'
+base_dir = '../images'
 if not os.path.exists(base_dir):
     os.makedirs(base_dir)
 

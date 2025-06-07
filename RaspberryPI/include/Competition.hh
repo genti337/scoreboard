@@ -12,7 +12,7 @@ public:
     ~Competition();
 
     std::string shortDetail;	// Competition Short Detail
-    std::string state;		//
+    std::string state;		// Competition State (pre, in, post)
     std::string time;		//
     std::string date;		//
     std::string period;		//

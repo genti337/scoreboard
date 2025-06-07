@@ -1,5 +1,6 @@
 #include "../include/FetchData.hh"
 #include "../include/ESPNParser.hh"
+#include "../include/Display.hh"
 #include <json-c/json.h>
 #include <iostream>
 #include <vector>
@@ -34,13 +35,18 @@ void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition
     return;
 }
 
-void display_loop(std::atomic<bool>& running, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
+void display_loop(std::atomic<bool>& running, Display& display, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
 
     while (running) {
+        display.setText("Hello Huskers!");
+	display.setColor(255, 0, 0);
+
         if (competition_index == 0) {
            printf("Updating Competition 1\n");
+	   display.render(competitions2[0]);
         } else if (competition_index == 1) {
            printf("Updating Competition 2\n");
+	   display.render(competitions1[0]);
         } else {
            printf("%i\n", competition_index);
         }
@@ -52,6 +58,7 @@ void display_loop(std::atomic<bool>& running, int& competition_index, std::vecto
 
 int main() {
     ESPNParser parser;   // ESPN Parser Class
+    Display display(32, 64, 1, "adafruit-hat");
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
@@ -61,6 +68,7 @@ int main() {
 
     std::thread displayThread(display_loop,
                               std::ref(running),
+                              std::ref(display),
                               std::ref(competition_index),
                               std::ref(competitions1),
                               std::ref(competitions2));
