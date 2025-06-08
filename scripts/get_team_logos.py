@@ -118,7 +118,7 @@ def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
     if output_8_bit:
         img = img.convert('P', palette=Image.ADAPTIVE)
 
-    img.save(filename.split('..png')[0] + '.bmp')
+    img.save(filename.split('.png')[0] + '.bmp')
 
 # Create a base directory to store the logos if it doesn't exist
 base_dir = '../images'
