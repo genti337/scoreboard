@@ -14,11 +14,21 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     options.hardware_mapping = hardware_mapping.c_str();
 
     RuntimeOptions runtime_opt;
+    runtime_opt.gpio_slowdown = 4;
     matrix = CreateMatrixFromOptions(options, runtime_opt);
     canvas = matrix->CreateFrameCanvas();
 
-    loadFont("../fonts/04B_03__6pt.pcf");  // Adjust to your font path
+    loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
     textColor = rgb_matrix::Color(255, 255, 255);  // Default: white
+
+    InitializeMagick(nullptr);
+
+    competition_index1 = 0;
+    competition_index2 = 1;
+    competition_space = 32;
+
+    x_init1 = cols * chain_length;
+    x_init2 = cols * chain_length + 128 + competition_space;
 }
 
 Display::~Display() {
@@ -52,20 +62,26 @@ void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
                           int min_x, int max_x, int y) {
     int text_width = getTextWidth(font, text);
     int x = min_x + (max_x - min_x - text_width) / 2;
-    DrawText(canvas, font, x, y, rgb_matrix::Color(0, 0, 0), nullptr, text.c_str());
+    DrawText(canvas, font, x, y, rgb_matrix::Color(255, 255, 255), nullptr, text.c_str());
 }
 
 void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
-    InitializeMagick(nullptr);
-
     Magick::Image image;
-    image.read(path);
-    //image.flip();              // Optional: Flip vertically
+
+    try {
+       image.read(path);
+    } catch (const Magick::Exception &error) {
+       std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
+       return;
+    }
+
+    image.type(Magick::TrueColorType);
+//    image.flip();              // Optional: Flip vertically
     image.modifyImage();       // Allow pixel access
 
     for (size_t y = 0; y < image.rows(); ++y) {
         for (size_t x = 0; x < image.columns(); ++x) {
-            Magick::ColorRGB color = image.pixelColor(x, y);
+            const Magick::ColorRGB color = image.pixelColor(x, y);
 
             int draw_x = static_cast<int>(x) + offset_x;
             int draw_y = static_cast<int>(y) + offset_y;
@@ -82,21 +98,18 @@ void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
     }
 }
 
-void Display::render(Competition competition, const std::string& images_dir) {
-    // Clear the Canvas for Update
-    canvas->Clear();
-
+void Display::draw_competition(Competition competition, int x_init, const std::string& images_dir) {
     // Team Abbreviations
-    center_text(font, competition.AwayTeam.abbr, 34, 50, 5);
-    center_text(font, competition.HomeTeam.abbr, 78, 94, 5);
+    center_text(font, competition.AwayTeam.abbr, x_init+34, x_init+50, 10);
+    center_text(font, competition.HomeTeam.abbr, x_init+78, x_init+94, 10);
 
     // Team Logos
-    oss.clear();
-    oss << images_dir << competition.AwayTeam.abbr << ".bmp";
-    drawImage(oss.str());
-    oss.clear();
-    oss << images_dir << competition.HomeTeam.abbr << ".bmp";
-    drawImage(oss.str());
+    std::ostringstream oss1("");
+    oss1 << images_dir << competition.AwayTeam.abbr << ".bmp";
+    drawImage(oss1.str(), x_init);
+    std::ostringstream oss2("");
+    oss2 << images_dir << competition.HomeTeam.abbr << ".bmp";
+    drawImage(oss2.str(), x_init+96);
 
     if (competition.state == "pre") {
 
@@ -110,6 +123,42 @@ void Display::render(Competition competition, const std::string& images_dir) {
        center_text(font, competition.AwayTeam.score, 34, 50, 14);
        center_text(font, competition.HomeTeam.score, 78, 94, 14);
 
+    }
+
+    return;
+}
+
+void Display::render(std::vector<Competition> competitions, const std::string& images_dir) {
+
+
+    // Clear the Canvas for Update
+    canvas->Clear();
+
+    // Draw the Competitions
+    draw_competition(competitions[competition_index1], x_init1, images_dir);
+    draw_competition(competitions[competition_index2], x_init2, images_dir);
+
+    //  Reset the X-Offset for Scrolling and Update Competition Index
+    x_init1 -= 1;
+    x_init2 -= 1;
+    if (x_init1 < -matrix->width()) {
+       x_init1 = x_init2 + 128 + competition_space;
+
+       if (competition_index1 < competitions.size() - 2) {
+          competition_index1 += 2;
+       } else {
+          competition_index1 = 0;
+       }
+    }
+    
+    if (x_init2 < -matrix->width()) {
+       x_init2 = x_init1 + 128 + competition_space;
+
+       if (competition_index2 < competitions.size() - 2) {
+          competition_index2 += 2;
+       } else {
+          competition_index2 = 1;
+       }
     }
 
     canvas = matrix->SwapOnVSync(canvas);

@@ -41,16 +41,14 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
         display.setText("Hello Huskers!");
 	display.setColor(255, 0, 0);
 
-        if (competition_index == 0) {
-           printf("Updating Competition 1\n");
-	   display.render(competitions2[0], "../images/mlb/");
-        } else if (competition_index == 1) {
-           printf("Updating Competition 2\n");
-	   display.render(competitions1[0], "../images/mlb/");
+        if (competition_index == 0 && competitions2.size() > 0) {
+	   display.render(competitions2, "../images/mlb/");
+        } else if (competition_index == 1 && competitions1.size() > 0) {
+	   display.render(competitions1, "../images/mlb/");
         } else {
            printf("%i\n", competition_index);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));  // Fast update
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
     }
 
     return;
@@ -58,7 +56,7 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
 
 int main() {
     ESPNParser parser;   // ESPN Parser Class
-    Display display(32, 64, 1, "adafruit-hat");
+    Display display(32, 64, 2, "adafruit-hat");
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
