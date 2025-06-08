@@ -118,7 +118,7 @@ def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
     if output_8_bit:
         img = img.convert('P', palette=Image.ADAPTIVE)
 
-    img.save(filename.split('.')[0] + '.bmp')
+    img.save(filename.split('..png')[0] + '.bmp')
 
 # Create a base directory to store the logos if it doesn't exist
 base_dir = '../images'
@@ -134,6 +134,8 @@ for i in range(len(sport_leagues)):
     sport_dir = os.path.join(base_dir, bitmap_directories[i])
     if not os.path.exists(sport_dir):
         os.makedirs(sport_dir)
+
+    print(sport_dir)
 
     # Set the URL for the JSON file for the current league
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams"
@@ -168,7 +170,7 @@ for i in range(len(sport_leagues)):
           # Delete the original .png file
           os.remove(img_path_png)
        except:
-          print("Error creating logo for %s" % (team))
+          print("Error creating logo for %s" % (abbreviation))
 
 print("All logos have been downloaded, processed, and resized!")
 
