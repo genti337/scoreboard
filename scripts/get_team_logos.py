@@ -22,7 +22,7 @@ sport_names = ["baseball"]
 #sport_leagues = ["nfl", "mlb", "usa.1", "nhl", "nba"]
 sport_leagues = ["mlb"]
 # directory to match CircuitPython code folder names
-bitmap_directories = ["college-baseball"]
+bitmap_directories = ["mlb"]
 
 # Constants and function for image processing
 GAMMA = 2.6
@@ -36,89 +36,89 @@ PASSTHROUGH = ((0, 0, 0),
                (255, 0, 255),
                (255, 255, 255))
 
-def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
-    try:
-        image = Image.open(filename).convert("RGBA")
-
-        # Smart crop to non-transparent content
-        bbox = image.getbbox()
-        if bbox:
-            image = image.crop(bbox)
-
-        # Resize with antialiasing and center into 32x32 canvas
-        image = ImageOps.fit(image, (32, 32), method=Image.LANCZOS, centering=(0.5, 0.5))
-
-        # Boost contrast and sharpness to enhance fine lines
-        image = ImageEnhance.Contrast(image).enhance(1.5)
-        image = ImageEnhance.Sharpness(image).enhance(2.5)
-
-        # Gamma correction
-        def gamma_correct(c):
-            return int(pow(c / 255.0, GAMMA) * 255.0 + 0.5)
-        lut = [gamma_correct(i) for i in range(256)]
-
-        r, g, b, a = image.split()
-        r = r.point(lut)
-        g = g.point(lut)
-        b = b.point(lut)
-        image = Image.merge("RGB", (r, g, b))
-
-        if output_8_bit:
-            image = image.quantize(colors=255, method=2)
-
-        # Save BMP version
-        output_path = filename.replace(".png", ".bmp")
-        image.save(output_path)
-        print(f"Saved: {output_path}")
-
-    except Exception as e:
-        print(f"Failed to process {filename}: {e}")
-
 #def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
-#    """Given a color image filename, load image and apply gamma correction
-#       and error-diffusion dithering while quantizing to 565 color
-#       resolution. If output_8_bit is True, image is reduced to 8-bit
-#       paletted mode after quantization/dithering. If passthrough (a list
-#       of 3-tuple RGB values) is provided, dithering won't be applied to
-#       colors in the provided list, they'll be quantized only (allows areas
-#       of the image to remain clean and dither-free).
-#    """
-#    img = Image.open(filename).convert('RGB')
-#    err_next_pixel = (0, 0, 0)
-#    err_next_row = [(0, 0, 0) for _ in range(img.size[0])]
-#    for row in range(img.size[1]):
-#        for column in range(img.size[0]):
-#            pixel = img.getpixel((column, row))
-#            want = (math.pow(pixel[0] / 255.0, GAMMA) * 31.0,
-#                    math.pow(pixel[1] / 255.0, GAMMA) * 63.0,
-#                    math.pow(pixel[2] / 255.0, GAMMA) * 31.0)
-#            if pixel in passthrough:
-#                got = (pixel[0] >> 3,
-#                       pixel[1] >> 2,
-#                       pixel[2] >> 3)
-#            else:
-#                got = (min(max(int(err_next_pixel[0] * 0.5 +
-#                                   err_next_row[column][0] * 0.25 +
-#                                   want[0] + 0.5), 0), 31),
-#                       min(max(int(err_next_pixel[1] * 0.5 +
-#                                   err_next_row[column][1] * 0.25 +
-#                                   want[1] + 0.5), 0), 63),
-#                       min(max(int(err_next_pixel[2] * 0.5 +
-#                                   err_next_row[column][2] * 0.25 +
-#                                   want[2] + 0.5), 0), 31))
-#            err_next_pixel = (want[0] - got[0],
-#                              want[1] - got[1],
-#                              want[2] - got[2])
-#            err_next_row[column] = err_next_pixel
-#            rgb565 = ((got[0] << 3) | (got[0] >> 2),
-#                      (got[1] << 2) | (got[1] >> 4),
-#                      (got[2] << 3) | (got[2] >> 2))
-#            img.putpixel((column, row), rgb565)
+#    try:
+#        image = Image.open(filename).convert("RGBA")
 #
-#    if output_8_bit:
-#        img = img.convert('P', palette=Image.ADAPTIVE)
+#        # Smart crop to non-transparent content
+#        bbox = image.getbbox()
+#        if bbox:
+#            image = image.crop(bbox)
 #
-#    img.save(filename.split('.')[0] + '.bmp')
+#        # Resize with antialiasing and center into 32x32 canvas
+#        image = ImageOps.fit(image, (32, 32), method=Image.LANCZOS, centering=(0.5, 0.5))
+#
+#        # Boost contrast and sharpness to enhance fine lines
+#        image = ImageEnhance.Contrast(image).enhance(1.5)
+#        image = ImageEnhance.Sharpness(image).enhance(2.5)
+#
+#        # Gamma correction
+#        def gamma_correct(c):
+#            return int(pow(c / 255.0, GAMMA) * 255.0 + 0.5)
+#        lut = [gamma_correct(i) for i in range(256)]
+#
+#        r, g, b, a = image.split()
+#        r = r.point(lut)
+#        g = g.point(lut)
+#        b = b.point(lut)
+#        image = Image.merge("RGB", (r, g, b))
+#
+#        if output_8_bit:
+#            image = image.quantize(colors=255, method=2)
+#
+#        # Save BMP version
+#        output_path = filename.replace(".png", ".bmp")
+#        image.save(output_path)
+#        print(f"Saved: {output_path}")
+#
+#    except Exception as e:
+#        print(f"Failed to process {filename}: {e}")
+
+def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
+    """Given a color image filename, load image and apply gamma correction
+       and error-diffusion dithering while quantizing to 565 color
+       resolution. If output_8_bit is True, image is reduced to 8-bit
+       paletted mode after quantization/dithering. If passthrough (a list
+       of 3-tuple RGB values) is provided, dithering won't be applied to
+       colors in the provided list, they'll be quantized only (allows areas
+       of the image to remain clean and dither-free).
+    """
+    img = Image.open(filename).convert('RGB')
+    err_next_pixel = (0, 0, 0)
+    err_next_row = [(0, 0, 0) for _ in range(img.size[0])]
+    for row in range(img.size[1]):
+        for column in range(img.size[0]):
+            pixel = img.getpixel((column, row))
+            want = (math.pow(pixel[0] / 255.0, GAMMA) * 31.0,
+                    math.pow(pixel[1] / 255.0, GAMMA) * 63.0,
+                    math.pow(pixel[2] / 255.0, GAMMA) * 31.0)
+            if pixel in passthrough:
+                got = (pixel[0] >> 3,
+                       pixel[1] >> 2,
+                       pixel[2] >> 3)
+            else:
+                got = (min(max(int(err_next_pixel[0] * 0.5 +
+                                   err_next_row[column][0] * 0.25 +
+                                   want[0] + 0.5), 0), 31),
+                       min(max(int(err_next_pixel[1] * 0.5 +
+                                   err_next_row[column][1] * 0.25 +
+                                   want[1] + 0.5), 0), 63),
+                       min(max(int(err_next_pixel[2] * 0.5 +
+                                   err_next_row[column][2] * 0.25 +
+                                   want[2] + 0.5), 0), 31))
+            err_next_pixel = (want[0] - got[0],
+                              want[1] - got[1],
+                              want[2] - got[2])
+            err_next_row[column] = err_next_pixel
+            rgb565 = ((got[0] << 3) | (got[0] >> 2),
+                      (got[1] << 2) | (got[1] >> 4),
+                      (got[2] << 3) | (got[2] >> 2))
+            img.putpixel((column, row), rgb565)
+
+    if output_8_bit:
+        img = img.convert('P', palette=Image.ADAPTIVE)
+
+    img.save(filename.split('.')[0] + '.bmp')
 
 # Create a base directory to store the logos if it doesn't exist
 base_dir = '../images'
