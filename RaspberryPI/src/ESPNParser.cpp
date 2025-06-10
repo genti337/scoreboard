@@ -111,8 +111,6 @@ std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& json
 
             std::tie(game.date, game.time) = convertToLocalTime(comp["date"].get<std::string>());
 
-            printf("%s %s %s\n", game.state.c_str(), game.date.c_str(), game.time.c_str());
-
             for (const auto& team : competitors) {
                 bool is_home = (team["homeAway"] == "home");
 

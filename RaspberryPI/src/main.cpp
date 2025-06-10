@@ -31,7 +31,7 @@ void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition
             std::cerr << "No data received.\n";
         }
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));  // Fast update
+        std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
 
         printf("Finished fetching data!\n");
     }

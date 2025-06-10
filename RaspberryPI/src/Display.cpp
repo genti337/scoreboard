@@ -117,7 +117,7 @@ void Display::draw_competition(Competition competition, int x_init, const std::s
 
     // Pre Game Display
     if (competition.state == "pre") {
-       center_text(small_font, competition.date, x_init + 32, x_init + 96, 16);
+       center_text(small_font, competition.date, x_init + 32, x_init + 96, 15);
        center_text(small_font, competition.time, x_init + 32, x_init + 96, 22);
        center_text(small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
        center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
@@ -133,16 +133,18 @@ void Display::draw_competition(Competition competition, int x_init, const std::s
        }
 
        std::ostringstream oss3("");
-       oss3 << images_dir << "base_loaded.bmp";
-       drawImage(oss3.str(), x_init+66, 9);
-       drawImage(oss3.str(), x_init+60, 3);
-       drawImage(oss3.str(), x_init+54, 9);
+       oss3 << images_dir << "base_empty.bmp";
+       std::ostringstream oss4("");
+       oss4 << images_dir << "base_loaded.bmp";
 
+       drawImage(competition.on_first ? oss4.str() : oss3.str(), x_init+66, 9);
+       drawImage(competition.on_second ? oss4.str() : oss3.str(), x_init+60, 3);
+       drawImage(competition.on_third ? oss4.str() : oss3.str(), x_init+54, 9);
     // Post Game Display
     } else if (competition.state == "post") {
        center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16);
        center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16);
-       center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 24);
+       center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 20);
        center_text(small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
        center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
     }
