@@ -18,7 +18,10 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     matrix = CreateMatrixFromOptions(options, runtime_opt);
     canvas = matrix->CreateFrameCanvas();
 
-    loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
+    //FIXME loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
+    font.LoadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");
+    small_font.LoadFont("../rpi-rgb-led-matrix/fonts/4x6.bdf");
+
     textColor = rgb_matrix::Color(255, 255, 255);  // Default: white
 
     InitializeMagick(nullptr);
@@ -26,9 +29,10 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     competition_index1 = 0;
     competition_index2 = 1;
     competition_space = 32;
+    game_display_width = 128;
 
     x_init1 = cols * chain_length;
-    x_init2 = cols * chain_length + 128 + competition_space;
+    x_init2 = cols * chain_length + game_display_width + competition_space;
 }
 
 Display::~Display() {
@@ -100,29 +104,47 @@ void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
 
 void Display::draw_competition(Competition competition, int x_init, const std::string& images_dir) {
     // Team Abbreviations
-    center_text(font, competition.AwayTeam.abbr, x_init+34, x_init+50, 10);
-    center_text(font, competition.HomeTeam.abbr, x_init+78, x_init+94, 10);
+    center_text(font, competition.AwayTeam.abbr, x_init+34, x_init+50, 8);
+    center_text(font, competition.HomeTeam.abbr, x_init+78, x_init+94, 8);
 
     // Team Logos
     std::ostringstream oss1("");
-    oss1 << images_dir << competition.AwayTeam.abbr << ".bmp";
+    oss1 << images_dir << "mlb/" << competition.AwayTeam.abbr << ".bmp";
     drawImage(oss1.str(), x_init);
     std::ostringstream oss2("");
-    oss2 << images_dir << competition.HomeTeam.abbr << ".bmp";
+    oss2 << images_dir << "mlb/" << competition.HomeTeam.abbr << ".bmp";
     drawImage(oss2.str(), x_init+96);
 
+    // Pre Game Display
     if (competition.state == "pre") {
-
+       center_text(small_font, competition.date, x_init + 32, x_init + 96, 16);
+       center_text(small_font, competition.time, x_init + 32, x_init + 96, 22);
+       center_text(small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
+       center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
+    // Active Game Display
     } else if (competition.state == "in") {
-       // Team Scores
-       center_text(font, competition.AwayTeam.score, 34, 50, 14);
-       center_text(font, competition.HomeTeam.score, 78, 94, 14);
+       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16);
+       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16);
+       center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 30);
+       if (competition.shortDetail.find("Top") != std::string::npos) {
+           center_text(small_font, competition.outs, x_init + 32, x_init + 64, 23);
+       } else {
+           center_text(small_font, competition.outs, x_init + 64, x_init + 96, 23);
+       }
 
-    } else if (competition.state == "final") {
-       // Team Scores
-       center_text(font, competition.AwayTeam.score, 34, 50, 14);
-       center_text(font, competition.HomeTeam.score, 78, 94, 14);
+       std::ostringstream oss3("");
+       oss3 << images_dir << "base_loaded.bmp";
+       drawImage(oss3.str(), x_init+66, 9);
+       drawImage(oss3.str(), x_init+60, 3);
+       drawImage(oss3.str(), x_init+54, 9);
 
+    // Post Game Display
+    } else if (competition.state == "post") {
+       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16);
+       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16);
+       center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 24);
+       center_text(small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
+       center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
     }
 
     return;
@@ -142,7 +164,7 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
     x_init1 -= 1;
     x_init2 -= 1;
     if (x_init1 < -matrix->width()) {
-       x_init1 = x_init2 + 128 + competition_space;
+       x_init1 = x_init2 + game_display_width + competition_space;
 
        if (competition_index1 < competitions.size() - 2) {
           competition_index1 += 2;
@@ -152,7 +174,7 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
     }
     
     if (x_init2 < -matrix->width()) {
-       x_init2 = x_init1 + 128 + competition_space;
+       x_init2 = x_init1 + game_display_width + competition_space;
 
        if (competition_index2 < competitions.size() - 2) {
           competition_index2 += 2;

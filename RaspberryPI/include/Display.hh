@@ -25,6 +25,7 @@ private:
     rgb_matrix::RGBMatrix* matrix;
     rgb_matrix::FrameCanvas* canvas;
     rgb_matrix::Font font;
+    rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;
     std::string currentText;
 //    std::ostringstream oss;
@@ -34,6 +35,7 @@ private:
     int competition_index1;
     int competition_index2;
     int competition_space;
+    int game_display_width;
 
     void loadFont(const std::string& font_path);
 };

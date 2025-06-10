@@ -10,6 +10,8 @@
 void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
 
     while (running) {
+        printf("Fetching Data!\n");
+
         //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
         FetchData fetcher("baseball", "mlb");
         std::string data = fetcher.fetch();
@@ -17,9 +19,9 @@ void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition
         if (!data.empty()) {
             if (competition_index <= 0) {
                 competition_index = 1;
-                competitions1 = parser.parseESPNScoreboard(data);
+                competitions1 = parser.parseESPNScoreboard(data, "baseball");
             } else {
-                competitions2 = parser.parseESPNScoreboard(data);
+                competitions2 = parser.parseESPNScoreboard(data, "baseball");
                 competition_index = 0;
             }
 
@@ -30,6 +32,8 @@ void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(5));  // Fast update
+
+        printf("Finished fetching data!\n");
     }
 
     return;
@@ -38,15 +42,12 @@ void fetch_loop(std::atomic<bool>& running, ESPNParser& parser, int& competition
 void display_loop(std::atomic<bool>& running, Display& display, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
 
     while (running) {
-        display.setText("Hello Huskers!");
-	display.setColor(255, 0, 0);
-
         if (competition_index == 0 && competitions2.size() > 0) {
-	   display.render(competitions2, "../images/mlb/");
+	   display.render(competitions2, "../images/");
         } else if (competition_index == 1 && competitions1.size() > 0) {
-	   display.render(competitions1, "../images/mlb/");
+	   display.render(competitions1, "../images/");
         } else {
-           printf("%i\n", competition_index);
+//           printf("%i\n", competition_index);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
     }

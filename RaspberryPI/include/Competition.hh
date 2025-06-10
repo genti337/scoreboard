@@ -17,6 +17,8 @@ public:
     std::string date;		//
     std::string period;		//
     std::string clock;		//
+    std::string record;		//
+    std::string rank;		//
 
     Team HomeTeam;
     Team AwayTeam;
