@@ -13,16 +13,17 @@
 import os
 import math
 import requests
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter, ImageStat
+from io import BytesIO
 
 # the name of the sports you want to follow
 #sport_names = ["football", "baseball", "soccer", "hockey", "basketball"]
-sport_names = ["baseball"]
+sport_names = ["football"]
 # the name of the corresponding leages you want to follow
 #sport_leagues = ["nfl", "mlb", "usa.1", "nhl", "nba"]
-sport_leagues = ["mlb"]
+sport_leagues = ["college-football"]
 # directory to match CircuitPython code folder names
-bitmap_directories = ["mlb"]
+bitmap_directories = ["college-football"]
 
 # Constants and function for image processing
 GAMMA = 2.6
@@ -35,6 +36,71 @@ PASSTHROUGH = ((0, 0, 0),
                (0, 0, 255),
                (255, 0, 255),
                (255, 255, 255))
+
+MATRIX_SIZE = (32, 32)
+
+def score_logo_for_matrix(img):
+    try:
+        img = img.convert("RGB")
+        img = ImageEnhance.Contrast(img).enhance(2.0)  # strong contrast boost
+        img_small = img.resize((32, 32), Image.LANCZOS)
+
+        # Convert to grayscale and get stats
+        gray = img_small.convert("L")
+        stat = ImageStat.Stat(gray)
+        brightness = stat.mean[0]
+        contrast = stat.stddev[0]
+
+        # Calculate fill (non-black) pixel ratio
+        pixels = list(gray.getdata())
+        total = len(pixels)
+        lit_pixels = sum(1 for p in pixels if p > 40)
+        fill_ratio = lit_pixels / total
+
+        # RGB stats
+        avg_rgb = ImageStat.Stat(img_small).mean
+        avg_rgb_val = sum(avg_rgb[:3]) / 3
+
+        print(f"Brightness: {brightness:.1f}, Contrast: {contrast:.1f}, Fill: {fill_ratio:.2f}, Avg RGB: {avg_rgb_val:.1f}")
+
+        # 🚫 Hard rejections
+        if fill_ratio < 0.15:
+            return -1  # too sparse
+        if brightness < 35:
+            return -1  # too dark
+        if avg_rgb_val < 45:
+            return -1  # overall too black
+
+        # ✅ Score for readability
+        return (brightness * 0.6) + (contrast * 1.2) + (fill_ratio * 50)
+
+    except Exception as e:
+        print("Error scoring image:", e)
+        return -1
+
+def fetch_best_logo(team_id):
+    url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/{team_id}"
+    resp = requests.get(url)
+    team = resp.json().get("team", {})
+    logos = team.get("logos", [])
+
+    best_logo = None
+    best_score = -1
+
+    for i, logo in enumerate(logos):
+        logo_url = logo.get("href")
+        try:
+            image_response = requests.get(logo_url)
+            img = Image.open(BytesIO(image_response.content))
+            score = score_logo_for_matrix(img)
+            print(f"Logo {i+1}: {logo_url} | Score: {score:.2f}")
+            if score > best_score:
+                best_score = score
+                best_logo = logo_url
+        except Exception as e:
+            print(f"Failed to process logo {logo_url}: {e}")
+
+    return best_logo
 
 #def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
 #    try:
@@ -84,6 +150,7 @@ def process(filename, output_8_bit=True, passthrough=PASSTHROUGH):
        of the image to remain clean and dither-free).
     """
     img = Image.open(filename).convert('RGB')
+    img = ImageEnhance.Contrast(img).enhance(1.5)  # Boost contrast to help thin outlines
     err_next_pixel = (0, 0, 0)
     err_next_row = [(0, 0, 0) for _ in range(img.size[0])]
     for row in range(img.size[1]):
@@ -138,7 +205,7 @@ for i in range(len(sport_leagues)):
     print(sport_dir)
 
     # Set the URL for the JSON file for the current league
-    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams"
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams?limit=500"
 
     # Fetch the JSON data
     response = requests.get(url)
@@ -151,7 +218,9 @@ for i in range(len(sport_leagues)):
     for team in teams:
        try:
           abbreviation = team['team']['abbreviation']
-          logo_url = team['team']['logos'][0]['href']
+          team_id = team['team']['id']
+#          logo_url = team['team']['logos'][0]['href']
+          logo_url = fetch_best_logo(team_id=team_id)
           
           print(f"Downloading logo for {abbreviation} from {league}...")
           
