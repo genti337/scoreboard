@@ -18,12 +18,12 @@ from io import BytesIO
 
 # the name of the sports you want to follow
 #sport_names = ["football", "baseball", "soccer", "hockey", "basketball"]
-sport_names = ["football"]
+sport_names = ["baseball"]
 # the name of the corresponding leages you want to follow
 #sport_leagues = ["nfl", "mlb", "usa.1", "nhl", "nba"]
-sport_leagues = ["college-football"]
+sport_leagues = ["mlb"]
 # directory to match CircuitPython code folder names
-bitmap_directories = ["college-football"]
+bitmap_directories = ["mlb"]
 
 # Constants and function for image processing
 GAMMA = 2.6
@@ -72,14 +72,14 @@ def score_logo_for_matrix(img):
             return -1  # overall too black
 
         # ✅ Score for readability
-        return (brightness * 0.6) + (contrast * 1.2) + (fill_ratio * 50)
+        return (brightness * 1.0) + (contrast * 1.0) + (fill_ratio * 50)
 
     except Exception as e:
         print("Error scoring image:", e)
         return -1
 
-def fetch_best_logo(team_id):
-    url = f"https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/{team_id}"
+def fetch_best_logo(sport, league, team_id):
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams/{team_id}"
     resp = requests.get(url)
     team = resp.json().get("team", {})
     logos = team.get("logos", [])
@@ -220,7 +220,7 @@ for i in range(len(sport_leagues)):
           abbreviation = team['team']['abbreviation']
           team_id = team['team']['id']
 #          logo_url = team['team']['logos'][0]['href']
-          logo_url = fetch_best_logo(team_id=team_id)
+          logo_url = fetch_best_logo(sport, league, team_id=team_id)
           
           print(f"Downloading logo for {abbreviation} from {league}...")
           
@@ -239,7 +239,9 @@ for i in range(len(sport_leagues)):
           # Delete the original .png file
           os.remove(img_path_png)
        except:
+          print(team['team']['id'])
           print("Error creating logo for %s" % (abbreviation))
+          break
 
 print("All logos have been downloaded, processed, and resized!")
 
