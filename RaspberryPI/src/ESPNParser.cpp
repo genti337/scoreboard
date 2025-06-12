@@ -12,6 +12,13 @@ ESPNParser::~ESPNParser() {
    //TODO
 }
 
+void ESPNParser::set_sport(const std::string& ext_sport, const std::string& ext_league) {
+    sport = ext_sport;
+    league = ext_league;
+
+    return;
+}
+
 std::string ESPNParser::getTeamRecord(const json& team_json) {
     try {
         if (!team_json.contains("records")) return "";
@@ -92,7 +99,7 @@ std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::st
 }
 
 // ESPN Scoreboard Parser
-std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& jsonStr, const std::string& sport) {
+std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
     std::vector<Competition> competitions;
 
     json j = json::parse(jsonStr);

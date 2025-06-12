@@ -13,6 +13,7 @@ public:
     Display(int rows, int cols, int chain_length, const std::string& hardware_mapping);
     ~Display();
 
+    void set_sport(const std::string& ext_sport, const std::string& ext_league);
     void setText(const std::string& text);
     void setColor(uint8_t r, uint8_t g, uint8_t b);
     int getTextWidth(const rgb_matrix::Font& font, const std::string& text);
@@ -28,12 +29,15 @@ private:
     rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;
     std::string currentText;
-//    std::ostringstream oss;
+    std::string sport;
+    std::string league;
 
     int x_init1;
     int x_init2;
+    int x_init3;
     int competition_index1;
     int competition_index2;
+    int competition_index3;
     int competition_space;
     int game_display_width;
 
