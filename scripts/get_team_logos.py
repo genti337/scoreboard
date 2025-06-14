@@ -21,9 +21,9 @@ from io import BytesIO
 sport_names = ["baseball"]
 # the name of the corresponding leages you want to follow
 #sport_leagues = ["nfl", "mlb", "usa.1", "nhl", "nba"]
-sport_leagues = ["mlb"]
+sport_leagues = ["college-baseball"]
 # directory to match CircuitPython code folder names
-bitmap_directories = ["mlb"]
+bitmap_directories = ["college-baseball"]
 
 # Constants and function for image processing
 GAMMA = 2.6
@@ -70,6 +70,8 @@ def score_logo_for_matrix(img):
             return -1  # too dark
         if avg_rgb_val < 45:
             return -1  # overall too black
+        if contrast < 10:
+            return -1  # Not enought contrast
 
         # ✅ Score for readability
         return (brightness * 1.0) + (contrast * 1.0) + (fill_ratio * 50)
@@ -241,7 +243,6 @@ for i in range(len(sport_leagues)):
        except:
           print(team['team']['id'])
           print("Error creating logo for %s" % (abbreviation))
-          break
 
 print("All logos have been downloaded, processed, and resized!")
 
