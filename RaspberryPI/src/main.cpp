@@ -66,12 +66,13 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
 int main() {
     ESPNParser parser;   // ESPN Parser Class
     //Display display(32, 64, 2, "adafruit-hat");
-    Display display(32, 64, 3, "adafruit-hat");
+    Display display(32, 64, 5, "adafruit-hat");
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
     std::string sport = "baseball";
     std::string league = "mlb";
+    //std::string league = "college-baseball";
 
     printf("%s\n", sport.c_str());
 

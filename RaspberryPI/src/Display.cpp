@@ -12,9 +12,9 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     options.chain_length = chain_length;
     options.parallel = 1;
     options.hardware_mapping = hardware_mapping.c_str();
-//    runtime_opt.pwm_bits = 8;
+    options.pwm_bits = 8;
     options.pwm_lsb_nanoseconds = 180; //130;  // ✅ Fine for Pi 4 or Zero 2 W
-    options.brightness = 75;  // ✅ Fine for Pi 4 or Zero 2 W
+    options.brightness = 50;  // ✅ Fine for Pi 4 or Zero 2 W
 
     RuntimeOptions runtime_opt;
     runtime_opt.gpio_slowdown = 5;
@@ -31,11 +31,13 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
 
     competition_index1 = 0;
     competition_index2 = 1;
-    competition_space = 24;
+    competition_index3 = 2;
+    competition_space = 20;
     game_display_width = 128;
 
     x_init1 = cols * chain_length;
-    x_init2 = cols * chain_length + game_display_width + competition_space;
+    x_init2 = x_init1 + game_display_width + competition_space;
+    x_init3 = x_init2 + game_display_width + competition_space;
 }
 
 Display::~Display() {
@@ -119,10 +121,10 @@ void Display::draw_competition(Competition competition, int x_init, const std::s
 
     // Team Logos
     std::ostringstream oss1("");
-    oss1 << images_dir << "mlb/" << competition.AwayTeam.abbr << ".bmp";
+    oss1 << images_dir << league << "/" << competition.AwayTeam.abbr << ".bmp";
     drawImage(oss1.str(), x_init);
     std::ostringstream oss2("");
-    oss2 << images_dir << "mlb/" << competition.HomeTeam.abbr << ".bmp";
+    oss2 << images_dir << league << "/" << competition.HomeTeam.abbr << ".bmp";
     drawImage(oss2.str(), x_init+96);
 
     // Pre Game Display
@@ -175,30 +177,43 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
     // Draw the Competitions
     draw_competition(competitions[competition_index1], x_init1, images_dir);
     draw_competition(competitions[competition_index2], x_init2, images_dir);
-//    draw_competition(competitions[competition_index3], x_init3, images_dir);
+    draw_competition(competitions[competition_index3], x_init3, images_dir);
 
     //  Reset the X-Offset for Scrolling and Update Competition Index
     x_init1 -= 1;
     x_init2 -= 1;
-    if (x_init1 < -game_display_width) {
-       x_init1 = std::max(x_init2 + game_display_width + competition_space, matrix->width());
+    x_init3 -= 1;
+    if (x_init1 <= -game_display_width) {
+       x_init1 = std::max(std::max(x_init2, x_init3) + game_display_width + competition_space, matrix->width());
 
-       if (competition_index1 < competitions.size() - 2) {
-          competition_index1 += 2;
+       if (competition_index1 < competitions.size() - 3) {
+          competition_index1 += 3;
        } else {
           competition_index1 = 0;
        }
     }
     
-    if (x_init2 < -game_display_width) {
-       x_init2 = std::max(x_init1 + game_display_width + competition_space, matrix->width());
+    if (x_init2 <= -game_display_width) {
+       x_init2 = std::max(std::max(x_init1, x_init3) + game_display_width + competition_space, matrix->width());
 
-       if (competition_index2 < competitions.size() - 2) {
-          competition_index2 += 2;
+       if (competition_index2 < competitions.size() - 3) {
+          competition_index2 += 3;
        } else {
           competition_index2 = 1;
        }
     }
+
+    if (x_init3 <= -game_display_width) {
+       x_init3 = std::max(std::max(x_init1, x_init2) + game_display_width + competition_space, matrix->width());
+
+       if (competition_index3 < competitions.size() - 3) {
+          competition_index3 += 3;
+       } else {
+          competition_index3 = 2;
+       }
+    }
+
+//    printf("%i %i %i\n", x_init1, x_init2, x_init3);
 
     canvas = matrix->SwapOnVSync(canvas);
 }
