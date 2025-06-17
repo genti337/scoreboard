@@ -70,17 +70,23 @@ int main() {
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
-    std::string sport = "baseball";
-    std::string league = "mlb";
+    std::vector<std::string> sports;
+    std::vector<std::string> leagues;
     //std::string league = "college-baseball";
 
-    printf("%s\n", sport.c_str());
+    // Sports and Leagues
+    sports.push_back("baseball");
+    sports.push_back("baseball");
+    leagues.push_back("mlb");
+    leagues.push_back("college-baseball");
+
+//    printf("%s\n", sport.c_str());
 
     std::atomic<bool> running(true);
 
     // Initialize Sport
-    display.set_sport(std::ref(sport), std::ref(league));
-    parser.set_sport(std::ref(sport), std::ref(league));
+    display.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
+    parser.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
 
     std::thread displayThread(display_loop,
                               std::ref(running),
@@ -94,8 +100,8 @@ int main() {
                             std::ref(competition_index),
                             std::ref(competitions1),
                             std::ref(competitions2),
-                            sport, 
-                            league);
+                            sports[0], 
+                            leagues[0]);
 
     std::cout << "Press Enter to stop..." << std::endl;
     std::cin.get();  // Wait for user input

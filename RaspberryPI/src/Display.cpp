@@ -12,7 +12,7 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     options.chain_length = chain_length;
     options.parallel = 1;
     options.hardware_mapping = hardware_mapping.c_str();
-    options.pwm_bits = 8;
+    options.pwm_bits = 11; //8;
     options.pwm_lsb_nanoseconds = 180; //130;  // ✅ Fine for Pi 4 or Zero 2 W
     options.brightness = 50;  // ✅ Fine for Pi 4 or Zero 2 W
 
@@ -35,7 +35,8 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     competition_space = 20;
     game_display_width = 128;
 
-    x_init1 = cols * chain_length;
+    x_init4 = cols * chain_length;
+    x_init1 = x_init4 + 32 + competition_space;
     x_init2 = x_init1 + game_display_width + competition_space;
     x_init3 = x_init2 + game_display_width + competition_space;
 }
@@ -75,10 +76,11 @@ int Display::getTextWidth(const rgb_matrix::Font& font, const std::string& text)
 }
 
 void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
-                          int min_x, int max_x, int y) {
+                          int min_x, int max_x, int y,
+                          int red, int green, int blue) {
     int text_width = getTextWidth(font, text);
     int x = min_x + (max_x - min_x - text_width) / 2;
-    DrawText(canvas, font, x, y, rgb_matrix::Color(255, 255, 255), nullptr, text.c_str());
+    DrawText(canvas, font, x, y, rgb_matrix::Color(red, green, blue), nullptr, text.c_str());
 }
 
 void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
@@ -135,8 +137,8 @@ void Display::draw_competition(Competition competition, int x_init, const std::s
        center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
     // Active Game Display
     } else if (competition.state == "in") {
-       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16);
-       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16);
+       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16, 255, 255, 0);
+       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16, 255, 255, 0);
        center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 30);
 
        // Baseball Display Elements
@@ -158,8 +160,8 @@ void Display::draw_competition(Competition competition, int x_init, const std::s
        }
     // Post Game Display
     } else if (competition.state == "post") {
-       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16);
-       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16);
+       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16, 255, 255, 0);
+       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16, 255, 255, 0);
        center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 20);
        center_text(small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
        center_text(small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
@@ -174,7 +176,14 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
     // Clear the Canvas for Update
     canvas->Clear();
 
+    // Draw the Sport Logo
+    if (competition_index1 == 0) {
+       drawImage("../images/mlb.bmp", x_init4, 0);
+       //drawImage("../images/college-baseball.bmp", x_init4, 0);
+    }
+
     // Draw the Competitions
+    draw_competition(competitions[competition_index1], x_init1, images_dir);
     draw_competition(competitions[competition_index1], x_init1, images_dir);
     draw_competition(competitions[competition_index2], x_init2, images_dir);
     draw_competition(competitions[competition_index3], x_init3, images_dir);
@@ -183,6 +192,7 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
     x_init1 -= 1;
     x_init2 -= 1;
     x_init3 -= 1;
+    x_init4 -= 1;
     if (x_init1 <= -game_display_width) {
        x_init1 = std::max(std::max(x_init2, x_init3) + game_display_width + competition_space, matrix->width());
 
@@ -190,6 +200,8 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
           competition_index1 += 3;
        } else {
           competition_index1 = 0;
+          x_init4 = std::max(std::max(x_init2, x_init3) + game_display_width + competition_space, matrix->width());
+          x_init1 += 32 + competition_space;
        }
     }
     
@@ -212,8 +224,6 @@ void Display::render(std::vector<Competition> competitions, const std::string& i
           competition_index3 = 2;
        }
     }
-
-//    printf("%i %i %i\n", x_init1, x_init2, x_init3);
 
     canvas = matrix->SwapOnVSync(canvas);
 }

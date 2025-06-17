@@ -17,7 +17,7 @@ public:
     void setText(const std::string& text);
     void setColor(uint8_t r, uint8_t g, uint8_t b);
     int getTextWidth(const rgb_matrix::Font& font, const std::string& text);
-    void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y);
+    void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, int red=255, int green=255, int blue=255);
     void drawImage(const std::string& path, int offset_x = 0, int offset_y = 0);
     void draw_competition(Competition competition, int x_init, const std::string& images_dir);
     void render(std::vector<Competition> competitions, const std::string& images_dir);
@@ -35,6 +35,7 @@ private:
     int x_init1;
     int x_init2;
     int x_init3;
+    int x_init4;
     int competition_index1;
     int competition_index2;
     int competition_index3;
