@@ -57,7 +57,8 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
         } else {
 //           printf("%i\n", competition_index);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+        //std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+        std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
     }
 
     return;
@@ -76,9 +77,9 @@ int main() {
 
     // Sports and Leagues
     sports.push_back("baseball");
-    sports.push_back("baseball");
+//    sports.push_back("basketball");
     leagues.push_back("mlb");
-    leagues.push_back("college-baseball");
+//    leagues.push_back("nba");
 
 //    printf("%s\n", sport.c_str());
 

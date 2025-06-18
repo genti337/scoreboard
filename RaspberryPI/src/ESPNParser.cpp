@@ -110,6 +110,8 @@ std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& json
         for (const auto& event : j["events"]) {
             Competition game;
 
+            game.sport = sport;
+
             const auto& comp = event["competitions"][0];
             const auto& competitors = comp["competitors"];
 
@@ -126,11 +128,15 @@ std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& json
                    game.HomeTeam.score = team["score"];
                    game.HomeTeam.record = getTeamRecord(team);
                    game.HomeTeam.rank = getTeamRank(team);
+                   game.HomeTeam.color = team["team"]["color"];
+                   game.HomeTeam.alt_color = team["team"]["alternateColor"];
                 } else {
                    game.AwayTeam.abbr = team["team"]["abbreviation"];
                    game.AwayTeam.score = team["score"];
                    game.AwayTeam.record = getTeamRecord(team);
                    game.AwayTeam.rank = getTeamRank(team);
+                   game.AwayTeam.color = team["team"]["color"];
+                   game.AwayTeam.alt_color = team["team"]["alternateColor"];
                 }
 
             }

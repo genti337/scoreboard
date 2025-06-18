@@ -18,8 +18,14 @@ public:
     void setColor(uint8_t r, uint8_t g, uint8_t b);
     int getTextWidth(const rgb_matrix::Font& font, const std::string& text);
     void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, int red=255, int green=255, int blue=255);
+    void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, rgb_matrix::Color color);
     void drawImage(const std::string& path, int offset_x = 0, int offset_y = 0);
-    void draw_competition(Competition competition, int x_init, const std::string& images_dir);
+    rgb_matrix::Color colorFromHex(const std::string& hex);
+    float getBrightness(const rgb_matrix::Color& color);
+    rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
+    void draw_baseball(Competition competition, int x_init, const std::string& images_dir);
+    void draw_basketball(Competition competition, int x_init, const std::string& images_dir);
+    void draw_football(Competition competition, int x_init, const std::string& images_dir);
     void render(std::vector<Competition> competitions, const std::string& images_dir);
 
 private:
@@ -32,13 +38,8 @@ private:
     std::string sport;
     std::string league;
 
-    int x_init1;
-    int x_init2;
-    int x_init3;
-    int x_init4;
-    int competition_index1;
-    int competition_index2;
-    int competition_index3;
+    int x_init[4];
+    int competition_index[3];
     int competition_space;
     int game_display_width;
 

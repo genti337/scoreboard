@@ -11,6 +11,7 @@ public:
     Competition();
     ~Competition();
 
+    std::string sport;		// Competition Sport
     std::string shortDetail;	// Competition Short Detail
     std::string state;		// Competition State (pre, in, post)
     std::string time;		//
