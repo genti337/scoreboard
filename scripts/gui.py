@@ -37,7 +37,7 @@ def start_app():
     global process
     if not process or process.poll() is not None:
         # Start your app (replace with your actual command)
-        process = subprocess.Popen(["sudo ../RaspberryPI/./scoreboard"])
+        process = subprocess.Popen(["sudo", "../RaspberryPI/./espn_jsonc"])
         #process = subprocess.Popen(["sleep", "60"])
         return "App started."
     return "App is already running."
