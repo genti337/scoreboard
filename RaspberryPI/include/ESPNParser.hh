@@ -16,15 +16,14 @@ public:
     ESPNParser();
     ~ESPNParser();
 
-    void set_sport(const std::string& ext_sport, const std::string& ext_league);
     std::string getTeamRecord(const json& team_json);
     std::string getTeamRank(const json& team_json);
     std::pair<std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
-    std::vector<Competition> parseESPNScoreboard(const std::string& jsonStr);
+    void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league);
 
 private:
-    std::string sport;
-    std::string league;
+//    std::string sport;
+//    std::string league;
 
 };
 

@@ -13,29 +13,43 @@ void fetch_loop(std::atomic<bool>& running,
                 int& competition_index,
                 std::vector<Competition>& competitions1,
                 std::vector<Competition>& competitions2,
-                const std::string& sport,
-                const std::string& league) {
+                std::vector<std::string>& sports,
+                std::vector<std::string>& leagues) {
 
     while (running) {
         printf("Fetching Data!\n");
 
         //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
-        FetchData fetcher(sport, league);
-        std::string data = fetcher.fetch();
+        for (int i=0; i<sports.size(); i++) {
+           FetchData fetcher(sports[i], leagues[i]);
+           std::string data = fetcher.fetch();
 
-        if (!data.empty()) {
-            if (competition_index <= 0) {
-                competition_index = 1;
-                competitions1 = parser.parseESPNScoreboard(data);
-            } else {
-                competitions2 = parser.parseESPNScoreboard(data);
-                competition_index = 0;
-            }
+           printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
+   
+           if (!data.empty()) {
+               if (competition_index <= 0) {
+                   if (i == 0) {
+                      competitions1.clear();
+                   }
+                   parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i]);
+               } else {
+                   if (i == 0) {
+                      competitions2.clear();
+                   }
+                   parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i]);
+               }
+   
+               std::cout << "Length of competitions: " << competitions1.size() << std::endl;
+   
+           } else {
+               std::cerr << "No data received.\n";
+           }
+        }
 
-            std::cout << "Length of competitions: " << competitions2.size() << std::endl;
-
+	if (competition_index <= 0) {
+	   competition_index = 1;
         } else {
-            std::cerr << "No data received.\n";
+	   competition_index = 0;
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
@@ -76,10 +90,10 @@ int main() {
     //std::string league = "college-baseball";
 
     // Sports and Leagues
+    sports.push_back("basketball");
     sports.push_back("baseball");
-//    sports.push_back("basketball");
+    leagues.push_back("nba");
     leagues.push_back("mlb");
-//    leagues.push_back("nba");
 
 //    printf("%s\n", sport.c_str());
 
@@ -87,7 +101,7 @@ int main() {
 
     // Initialize Sport
     display.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
-    parser.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
+//    parser.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
 
     std::thread displayThread(display_loop,
                               std::ref(running),
@@ -101,8 +115,8 @@ int main() {
                             std::ref(competition_index),
                             std::ref(competitions1),
                             std::ref(competitions2),
-                            sports[0], 
-                            leagues[0]);
+                            std::ref(sports), 
+                            std::ref(leagues));
 
     std::cout << "Press Enter to stop..." << std::endl;
     std::cin.get();  // Wait for user input

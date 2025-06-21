@@ -12,13 +12,6 @@ ESPNParser::~ESPNParser() {
    //TODO
 }
 
-void ESPNParser::set_sport(const std::string& ext_sport, const std::string& ext_league) {
-    sport = ext_sport;
-    league = ext_league;
-
-    return;
-}
-
 std::string ESPNParser::getTeamRecord(const json& team_json) {
     try {
         if (!team_json.contains("records")) return "";
@@ -99,18 +92,27 @@ std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::st
 }
 
 // ESPN Scoreboard Parser
-std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& jsonStr) {
-    std::vector<Competition> competitions;
+void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league) {
+//    std::vector<Competition> competitions;
 
     json j = json::parse(jsonStr);
 
-    if (!j.contains("events")) return competitions;
+    if (!j.contains("events")) return;
 
 //    try {
+
+	// Add competitions for Sport Logo
+	Competition game;
+	game.sports_logo_comp = true;
+	competitions.push_back(game);
+
+	// Parse Competition Data
         for (const auto& event : j["events"]) {
             Competition game;
 
             game.sport = sport;
+            game.league = league;
+            game.sports_logo_comp = false;
 
             const auto& comp = event["competitions"][0];
             const auto& competitors = comp["competitors"];
@@ -161,6 +163,6 @@ std::vector<Competition> ESPNParser::parseESPNScoreboard(const std::string& json
 //        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
 //    }
 
-    return competitions;
+    return;
 
 }

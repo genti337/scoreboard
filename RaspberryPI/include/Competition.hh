@@ -12,6 +12,7 @@ public:
     ~Competition();
 
     std::string sport;		// Competition Sport
+    std::string league;		// Competition League
     std::string shortDetail;	// Competition Short Detail
     std::string state;		// Competition State (pre, in, post)
     std::string time;		//
@@ -23,6 +24,10 @@ public:
 
     Team HomeTeam;
     Team AwayTeam;
+
+    int game_display_width;	// Display Width
+
+    bool sports_logo_comp;	// Competition Stores the Sports Logo
 
     // Baseball Data
     std::string inning;		//
