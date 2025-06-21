@@ -103,6 +103,8 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
 
 	// Add competitions for Sport Logo
 	Competition game;
+	game.sport = sport;
+	game.league = league;
 	game.sports_logo_comp = true;
 	competitions.push_back(game);
 

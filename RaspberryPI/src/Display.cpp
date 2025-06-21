@@ -256,9 +256,9 @@ void Display::draw_basketball(Competition& competition, int x_init, const std::s
     drawImage(competition, oss2.str(), x_init+56);
 
     // Team Abbreviations and Records
-    draw_text(competition, font, competition.AwayTeam.abbr, x_init + 96, 8, rgb_matrix::Color(255, 255, 255));
+    draw_text(competition, font, competition.AwayTeam.abbr, x_init + 96, 8, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
     draw_text(competition, small_font, competition.AwayTeam.record, x_init + 96, 15, rgb_matrix::Color(255, 255, 255));
-    draw_text(competition, font, competition.HomeTeam.abbr, x_init + 96, 24, rgb_matrix::Color(255, 255, 255));
+    draw_text(competition, font, competition.HomeTeam.abbr, x_init + 96, 24, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
     draw_text(competition, small_font, competition.HomeTeam.record, x_init + 96, 31, rgb_matrix::Color(255, 255, 255));
 
     int max_record_width_x = std::max(getTextWidth(small_font, competition.AwayTeam.record),
@@ -310,26 +310,16 @@ void Display::draw_football(Competition& competition, int x_init, const std::str
 }
 
 void Display::render(std::vector<Competition>& competitions, const std::string& images_dir) {
-
-//FIXME    if (first_pass) {
-//FIXME        x_init[1] = x_init[0] + 32 + competition_space;
-//FIXME        x_init[2] = x_init[1] + game_display_width[competitions[0].sport] + competition_space;
-//FIXME        x_init[3] = x_init[2] + game_display_width[competitions[1].sport] + competition_space;
-//FIXME    }
-
     // Clear the Canvas for Update
     canvas->Clear();
-
-    // Draw the Sport Logo
-//    if (competition_index[0] == 0) {
-//       drawImage(competition, "../images/mlb.bmp", x_init[0], 0);
-//    }
 
     // Draw the Competitions
     for (int i=0; i<4; i++) {
        if (competitions[competition_index[i]].sports_logo_comp) {
           max_display_x = -999;
-          drawImage(competitions[competition_index[i]], "../images/mlb.bmp", x_init[i], 0);
+          std::ostringstream oss1("");
+          oss1 << images_dir << competitions[competition_index[i]].league << ".bmp";
+          drawImage(competitions[competition_index[i]], oss1.str(), x_init[i], 0);
           competitions[competition_index[i]].game_display_width = max_display_x - x_init[i];
        } else if (competitions[competition_index[i]].sport == "baseball") {
           draw_baseball(competitions[competition_index[i]], x_init[i], images_dir);
