@@ -1,12 +1,14 @@
 #include "../include/FetchData.hh"
 #include "../include/ESPNParser.hh"
 #include "../include/Display.hh"
+
 #include <json-c/json.h>
 #include <iostream>
 #include <vector>
 #include <thread>
 #include <atomic>
 #include <string>
+#include <unordered_map>
 
 void fetch_loop(std::atomic<bool>& running, 
                 ESPNParser& parser, 
@@ -78,7 +80,12 @@ void display_loop(std::atomic<bool>& running, Display& display, int& competition
     return;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    std::unordered_map<std::string, std::pair<std::string, std::string>> inputArgs = {
+       {"--nba", {"basketball", "nba"}},
+       {"--mlb", {"baseball", "mlb"}},
+    };
+
     ESPNParser parser;   // ESPN Parser Class
     //Display display(32, 64, 2, "adafruit-hat");
     Display display(32, 64, 5, "adafruit-hat");
@@ -87,15 +94,17 @@ int main() {
     std::vector<Competition> competitions2;
     std::vector<std::string> sports;
     std::vector<std::string> leagues;
-    //std::string league = "college-baseball";
 
     // Sports and Leagues
-    sports.push_back("basketball");
-    sports.push_back("baseball");
-    leagues.push_back("nba");
-    leagues.push_back("mlb");
-
-//    printf("%s\n", sport.c_str());
+    for (int i=1; i<argc; i++) {
+       std::string flag(argv[i]);
+       if (inputArgs.find(flag) != inputArgs.end()) {
+           sports.push_back(inputArgs[flag].first);
+           leagues.push_back(inputArgs[flag].second);
+       } else {
+          std::cerr << "Unknown flag: " << flag << std::endl;
+       }
+    }
 
     std::atomic<bool> running(true);
 

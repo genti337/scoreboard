@@ -99,7 +99,7 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
 
     if (!j.contains("events")) return;
 
-//    try {
+    try {
 
 	// Add competitions for Sport Logo
 	Competition game;
@@ -161,9 +161,9 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
 
             competitions.push_back(game);
         }
-//    } catch (const std::exception& e) {
-//        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
-//    }
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
+    }
 
     return;
 
