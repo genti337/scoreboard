@@ -2,10 +2,8 @@
 #include <iostream>
 #include <sstream>
 
-FetchData::FetchData(const std::string& sport, const std::string& league) {
-    std::ostringstream url;
-    url << "https://site.api.espn.com/apis/site/v2/sports/" << sport << "/" << league << "/scoreboard";
-    api_url = url.str();
+FetchData::FetchData(const std::string url) {
+    api_url = url;
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
 }

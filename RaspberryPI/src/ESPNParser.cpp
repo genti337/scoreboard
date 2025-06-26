@@ -132,17 +132,16 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
                    game.HomeTeam.score = team["score"];
                    game.HomeTeam.record = getTeamRecord(team);
                    game.HomeTeam.rank = getTeamRank(team);
-                   game.HomeTeam.color = team["team"]["color"];
-                   game.HomeTeam.alt_color = team["team"]["alternateColor"];
+                   game.HomeTeam.color = (team.contains("color")) ? team["team"]["color"] : "FFFFFF";
+                   game.HomeTeam.alt_color = (team.contains("alternateColor")) ? team["team"]["alternateColor"] : "000000";
                 } else {
                    game.AwayTeam.abbr = team["team"]["abbreviation"];
                    game.AwayTeam.score = team["score"];
                    game.AwayTeam.record = getTeamRecord(team);
                    game.AwayTeam.rank = getTeamRank(team);
-                   game.AwayTeam.color = team["team"]["color"];
-                   game.AwayTeam.alt_color = team["team"]["alternateColor"];
+                   game.AwayTeam.color = (team.contains("color")) ? team["team"]["color"] : "FFFFFF";
+                   game.AwayTeam.alt_color = (team.contains("alternateColor")) ? team["team"]["alternateColor"] : "000000";
                 }
-
             }
 
             // Situation Data

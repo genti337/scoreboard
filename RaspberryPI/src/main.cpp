@@ -23,7 +23,9 @@ void fetch_loop(std::atomic<bool>& running,
 
         //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
         for (int i=0; i<sports.size(); i++) {
-           FetchData fetcher(sports[i], leagues[i]);
+           std::ostringstream url;
+           url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
+           FetchData fetcher(url.str());
            std::string data = fetcher.fetch();
 
            printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
@@ -84,6 +86,7 @@ int main(int argc, char* argv[]) {
     std::unordered_map<std::string, std::pair<std::string, std::string>> inputArgs = {
        {"--nba", {"basketball", "nba"}},
        {"--mlb", {"baseball", "mlb"}},
+       {"--ncaaf", {"football", "college-football"}},
     };
 
     ESPNParser parser;   // ESPN Parser Class

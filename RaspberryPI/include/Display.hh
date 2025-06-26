@@ -27,17 +27,25 @@ public:
     float getBrightness(const rgb_matrix::Color& color);
     rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
     void update_x_offset(std::vector<Competition> competitions, int index);
+    std::string format_quarter_time(const std::string& shortDetail);
     void draw_baseball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
+    void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     void render(std::vector<Competition>& competitions, const std::string& images_dir);
 
 private:
+    struct Pixel {
+        uint8_t r, g, b;
+    };
+
     rgb_matrix::RGBMatrix* matrix;
     rgb_matrix::FrameCanvas* canvas;
     rgb_matrix::Font font;
+    rgb_matrix::Font score_font;
     rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;
+    rgb_matrix::Color bg_color;
     std::string currentText;
     std::string sport;
     std::string league;
@@ -48,6 +56,8 @@ private:
     int competition_space;
     int max_display_x;
     int leading_index;
+
+    int num_comp_display;
 
     bool first_pass;
 
