@@ -12,7 +12,7 @@
 
 class Display {
 public:
-    Display(int rows, int cols, int chain_length, const std::string& hardware_mapping);
+    Display(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
     ~Display();
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);

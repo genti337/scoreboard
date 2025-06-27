@@ -5,7 +5,9 @@
 using namespace rgb_matrix;
 using namespace Magick;
 
-WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping) {
+WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active) {
+    if (!active) return;
+
     RGBMatrix::Options options;
     options.rows = rows;
     options.cols = cols;

@@ -158,18 +158,19 @@ int main(int argc, char* argv[]) {
        {"--ncaaf", {"football", "college-football"}},
     };
 
+    bool weather_display_active = true;
+
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
     //Display display(32, 64, 2, "adafruit-hat");
-    Display display(32, 64, 5, "adafruit-hat");
-    WeatherDisplay weather_display(32, 64, 5, "adafruit-hat");
+    Display display(32, 64, 5, "adafruit-hat", !weather_display_active);
+    WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", weather_display_active);
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
     std::vector<Weather> weather_data;
     std::vector<std::string> sports;
     std::vector<std::string> leagues;
-    bool weather_display_active = false;
 
     // Sports and Leagues
     for (int i=1; i<argc; i++) {

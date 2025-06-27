@@ -13,7 +13,7 @@
 
 class WeatherDisplay {
 public:
-    WeatherDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping);
+    WeatherDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
     ~WeatherDisplay();
 
     void setText(const std::string& text);
