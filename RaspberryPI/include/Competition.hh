@@ -17,6 +17,7 @@ public:
     std::string state;		// Competition State (pre, in, post)
     std::string time;		//
     std::string date;		//
+    std::string day;		//
     std::string period;		//
     std::string clock;		//
     std::string record;		//

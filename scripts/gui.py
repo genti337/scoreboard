@@ -14,6 +14,7 @@ HTML = """
     button { font-size: 20px; padding: 10px 40px; margin: 20px; }
     .section-label { font-size: 20px; font-weight: bold; margin-top: 20px; }
     .checkbox-group label { font-size: 18px; display: block; margin: 8px 0; }
+    #temp { font-size: 18px; margin-top: 30px; color: #555; }
   </style>
 </head>
 <body>
@@ -27,6 +28,8 @@ HTML = """
     <label><input type="checkbox" id="nba"> NBA</label>
   </div>
 
+  <div id="temp">Temperature: Loading...</div>
+
   <script>
     let running = false;
 
@@ -34,7 +37,6 @@ HTML = """
       const button = document.getElementById("toggle-btn");
 
       if (!running) {
-        // Start the app
         const mlb = document.getElementById("mlb").checked ? "MLB=1&" : "";
         const nba = document.getElementById("nba").checked ? "NBA=1&" : "";
 
@@ -45,15 +47,26 @@ HTML = """
             button.textContent = "Stop Scoreboard";
           });
       } else {
-        // Stop the app
         fetch("/stop")
           .then(res => res.text())
           .then(data => {
             running = false;
-            button.textContent = "Start App";
+            button.textContent = "Start Scoreboard";
           });
       }
     }
+
+    function updateTemp() {
+      fetch("/temperature")
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("temp").textContent = "Temperature: " + (data.temp + 2.0) + "°C";
+        });
+    }
+
+    // Update temperature every 5 seconds
+    setInterval(updateTemp, 300000);
+    updateTemp(); // Initial load
   </script>
 </body>
 </html>
@@ -69,7 +82,6 @@ def index():
 def start_app():
     global process
     if not process or process.poll() is not None:
-        # Use flags if needed
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
 
@@ -90,6 +102,15 @@ def stop_app():
         process.terminate()
         return "App stopped."
     return "App not running."
+
+@app.route("/temperature")
+def get_temperature():
+    try:
+        output = subprocess.check_output(["vcgencmd", "measure_temp"]).decode()
+        temp_str = output.strip().replace("temp=", "").replace("'C", "")
+        return jsonify({"temp": temp_str})
+    except Exception as e:
+        return jsonify({"temp": "N/A", "error": str(e)})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

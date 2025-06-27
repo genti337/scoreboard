@@ -40,9 +40,9 @@ std::string ESPNParser::getTeamRank(const json& team_json) {
     return "";
 }
 
-std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::string& utc_time_str) {
+std::tuple<std::string, std::string, std::string> ESPNParser::convertToLocalTime(const std::string& utc_time_str) {
     if (utc_time_str.length() < 16) {
-        return { "Invalid date", "Invalid time" };
+        return { "Invalid day", "Invalid date", "Invalid time" };
     }
 
     // Parse the input timestamp manually
@@ -62,12 +62,12 @@ std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::st
 
     time_t utc_time = timegm(&tm);
     if (utc_time == -1) {
-        return { "Invalid date", "Invalid time" };
+        return { "Invalid day", "Invalid date", "Invalid time" };
     }
 
     std::tm* local_tm = std::localtime(&utc_time);
     if (!local_tm) {
-        return { "Invalid date", "Invalid time" };
+        return { "Invalid day", "Invalid date", "Invalid time" };
     }
 
     // Day and month names
@@ -77,9 +77,9 @@ std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::st
         "July", "August", "September", "October", "November", "December"
     };
 
-    std::string date_str = std::string(days[local_tm->tm_wday]) + " " +
-                           months[local_tm->tm_mon] + " " +
-                           std::to_string(local_tm->tm_mday);
+    std::string day_str = std::string(days[local_tm->tm_wday]);
+
+    std::string date_str = std::string(months[local_tm->tm_mon]) + " " + std::to_string(local_tm->tm_mday);
 
     int hour12 = local_tm->tm_hour % 12;
     if (hour12 == 0) hour12 = 12;
@@ -88,7 +88,7 @@ std::pair<std::string, std::string> ESPNParser::convertToLocalTime(const std::st
     char time_buf[16];
     snprintf(time_buf, sizeof(time_buf), "%d:%02d %s", hour12, local_tm->tm_min, am_pm.c_str());
 
-    return { date_str, std::string(time_buf) };
+    return std::make_tuple(day_str, date_str, std::string(time_buf));
 }
 
 // ESPN Scoreboard Parser
@@ -122,7 +122,7 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
             game.state = comp["status"]["type"]["state"].get<std::string>();
             game.shortDetail = comp["status"]["type"]["shortDetail"].get<std::string>();
 
-            std::tie(game.date, game.time) = convertToLocalTime(comp["date"].get<std::string>());
+            std::tie(game.day, game.date, game.time) = convertToLocalTime(comp["date"].get<std::string>());
 
             for (const auto& team : competitors) {
                 bool is_home = (team["homeAway"] == "home");
@@ -132,15 +132,16 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
                    game.HomeTeam.score = team["score"];
                    game.HomeTeam.record = getTeamRecord(team);
                    game.HomeTeam.rank = getTeamRank(team);
-                   game.HomeTeam.color = (team.contains("color")) ? team["team"]["color"] : "FFFFFF";
-                   game.HomeTeam.alt_color = (team.contains("alternateColor")) ? team["team"]["alternateColor"] : "000000";
+                   game.HomeTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
+                   game.HomeTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
+                   printf("%s\n", game.HomeTeam.color.c_str());
                 } else {
                    game.AwayTeam.abbr = team["team"]["abbreviation"];
                    game.AwayTeam.score = team["score"];
                    game.AwayTeam.record = getTeamRecord(team);
                    game.AwayTeam.rank = getTeamRank(team);
-                   game.AwayTeam.color = (team.contains("color")) ? team["team"]["color"] : "FFFFFF";
-                   game.AwayTeam.alt_color = (team.contains("alternateColor")) ? team["team"]["alternateColor"] : "000000";
+                   game.AwayTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
+                   game.AwayTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
                 }
             }
 

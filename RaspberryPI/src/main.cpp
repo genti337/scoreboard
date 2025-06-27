@@ -1,6 +1,8 @@
 #include "../include/FetchData.hh"
 #include "../include/ESPNParser.hh"
+#include "../include/WeatherParser.hh"
 #include "../include/Display.hh"
+#include "../include/WeatherDisplay.hh"
 
 #include <json-c/json.h>
 #include <iostream>
@@ -10,53 +12,103 @@
 #include <string>
 #include <unordered_map>
 
+bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
+    CURL* curl = curl_easy_init();
+    char* escaped = curl_easy_escape(curl, city.c_str(), 0);
+    std::string url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + std::string(escaped);
+
+    curl_free(escaped);
+    curl_easy_cleanup(curl);
+
+    FetchData fetcher(url);
+    std::string result = fetcher.fetch();
+
+    auto j = json::parse(result, nullptr, false);
+
+    if (!j.is_array() || j.empty()) return false;
+
+    lat = stod(j[0]["lat"].get<std::string>());
+    lon = stod(j[0]["lon"].get<std::string>());
+
+    return true;
+}
+
 void fetch_loop(std::atomic<bool>& running, 
                 ESPNParser& parser, 
+                WeatherParser& weather_parser, 
                 int& competition_index,
                 std::vector<Competition>& competitions1,
                 std::vector<Competition>& competitions2,
+                std::vector<Weather>& weather_data,
                 std::vector<std::string>& sports,
-                std::vector<std::string>& leagues) {
+                std::vector<std::string>& leagues,
+                bool weather_display_active) {
+    std::string city = "League City";
+    double lat, lon;
+    getCoordinatesFromCity(city, lat, lon);
 
     while (running) {
         printf("Fetching Data!\n");
 
-        //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
-        for (int i=0; i<sports.size(); i++) {
-           std::ostringstream url;
-           url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
-           FetchData fetcher(url.str());
-           std::string data = fetcher.fetch();
+        if (weather_display_active) {
+            std::ostringstream ss_lat, ss_lon;
+            ss_lat << std::fixed << std::setprecision(4) << lat;
+            ss_lon << std::fixed << std::setprecision(4) << lon;
+            std::ostringstream url;
+            url << "https://api.weather.gov/points/" << ss_lat.str() << "," << ss_lon.str();
+            FetchData fetcher(url.str());
+            std::string data = fetcher.fetch();
 
-           printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
-   
-           if (!data.empty()) {
-               if (competition_index <= 0) {
-                   if (i == 0) {
-                      competitions1.clear();
-                   }
-                   parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i]);
-               } else {
-                   if (i == 0) {
-                      competitions2.clear();
-                   }
-                   parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i]);
-               }
-   
-               std::cout << "Length of competitions: " << competitions1.size() << std::endl;
-   
-           } else {
-               std::cerr << "No data received.\n";
-           }
-        }
+            Weather weather;
+            weather_data.push_back(weather);
 
-	if (competition_index <= 0) {
-	   competition_index = 1;
+            printf("\n\n%i\n\n", int(weather_data.size()));
+
+            weather_parser.parseWeather(data, std::ref(weather_data[0]));
+
+            printf("\n\n%i\n\n", int(weather_data.size()));
+
+            std::this_thread::sleep_for(std::chrono::seconds(600));  // Update every 10 min
+
         } else {
-	   competition_index = 0;
-        }
 
-        std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
+            //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
+            for (int i=0; i<int(sports.size()); i++) {
+               std::ostringstream url;
+               url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
+               FetchData fetcher(url.str());
+               std::string data = fetcher.fetch();
+
+               printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
+   
+               if (!data.empty()) {
+                   if (competition_index <= 0) {
+                       if (i == 0) {
+                          competitions1.clear();
+                       }
+                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i]);
+                   } else {
+                       if (i == 0) {
+                          competitions2.clear();
+                       }
+                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i]);
+                   }
+   
+                   std::cout << "Length of competitions: " << competitions1.size() << std::endl;
+   
+               } else {
+                   std::cerr << "No data received.\n";
+               }
+            }
+
+	    if (competition_index <= 0) {
+	       competition_index = 1;
+            } else {
+	       competition_index = 0;
+            }
+
+            std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
+        }
 
         printf("Finished fetching data!\n");
     }
@@ -64,19 +116,36 @@ void fetch_loop(std::atomic<bool>& running,
     return;
 }
 
-void display_loop(std::atomic<bool>& running, Display& display, int& competition_index, std::vector<Competition>& competitions1, std::vector<Competition>& competitions2) {
+void display_loop(std::atomic<bool>& running,
+                  Display& display,
+                  WeatherDisplay& weather_display,
+                  int& competition_index,
+                  std::vector<Competition>& competitions1,
+                  std::vector<Competition>& competitions2,
+                  std::vector<Weather>& weather_data,
+                  bool weather_display_active) {
     printf("Updating Display!\n");
 
     while (running) {
-        if (competition_index == 0 && competitions2.size() > 0) {
-	   display.render(competitions2, "../images/");
-        } else if (competition_index == 1 && competitions1.size() > 0) {
-	   display.render(competitions1, "../images/");
+        if (weather_display_active) {
+            if (weather_data.size() > 0) {
+    	        weather_display.render(weather_data, "../images/");
+            }
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));  // Fast update
         } else {
-//           printf("%i\n", competition_index);
+
+            if (competition_index == 0 && competitions2.size() > 0) {
+    	        display.render(competitions2, "../images/");
+            } else if (competition_index == 1 && competitions1.size() > 0) {
+    	        display.render(competitions1, "../images/");
+            } else {
+    //           printf("%i\n", competition_index);
+            }
+            //std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+
         }
-        //std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
-        std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
     }
 
     return;
@@ -90,13 +159,17 @@ int main(int argc, char* argv[]) {
     };
 
     ESPNParser parser;   // ESPN Parser Class
+    WeatherParser weather_parser;   // Parser Class
     //Display display(32, 64, 2, "adafruit-hat");
     Display display(32, 64, 5, "adafruit-hat");
+    WeatherDisplay weather_display(32, 64, 5, "adafruit-hat");
     int competition_index = -99;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
+    std::vector<Weather> weather_data;
     std::vector<std::string> sports;
     std::vector<std::string> leagues;
+    bool weather_display_active = false;
 
     // Sports and Leagues
     for (int i=1; i<argc; i++) {
@@ -118,17 +191,23 @@ int main(int argc, char* argv[]) {
     std::thread displayThread(display_loop,
                               std::ref(running),
                               std::ref(display),
+                              std::ref(weather_display),
                               std::ref(competition_index),
                               std::ref(competitions1),
-                              std::ref(competitions2));
+                              std::ref(competitions2),
+                              std::ref(weather_data),
+                              weather_display_active);
     std::thread fetchThread(fetch_loop,
                             std::ref(running),
                             std::ref(parser),
+                            std::ref(weather_parser),
                             std::ref(competition_index),
                             std::ref(competitions1),
                             std::ref(competitions2),
+                            std::ref(weather_data),
                             std::ref(sports), 
-                            std::ref(leagues));
+                            std::ref(leagues),
+                            weather_display_active);
 
     std::cout << "Press Enter to stop..." << std::endl;
     std::cin.get();  // Wait for user input

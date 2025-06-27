@@ -18,7 +18,7 @@ public:
 
     std::string getTeamRecord(const json& team_json);
     std::string getTeamRank(const json& team_json);
-    std::pair<std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
+    std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
     void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league);
 
 private:

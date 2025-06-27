@@ -21,13 +21,17 @@ size_t FetchData::writeCallback(void* contents, size_t size, size_t nmemb, std::
 std::string FetchData::fetch() {
     CURL* curl = curl_easy_init();
     std::string response;
+    struct curl_slist* headers = nullptr;
 
     if (!curl) {
         std::cerr << "Failed to initialize CURL\n";
         return "";
     }
 
+    headers = curl_slist_append(headers, "User-Agent: RaspberryPiLEDMatrix/1.0 (your_email@example.com)");
+
     curl_easy_setopt(curl, CURLOPT_URL, api_url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchData::writeCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
@@ -37,5 +41,6 @@ std::string FetchData::fetch() {
     }
 
     curl_easy_cleanup(curl);
+
     return response;
 }
