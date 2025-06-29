@@ -4,25 +4,47 @@
 #include <string>
 #include <vector>
 #include <curl/curl.h>
-#include "Team.hh"
+#include <json-c/json.h>
+#include "../include/nlohmann/json.hpp"
+
+#include "SunStatus.hh"
+
+using json = nlohmann::json;
 
 class Weather {
 public:
     Weather();
     ~Weather();
 
-    struct forecast_struct {
-        std::string time;
-        std::string period;
-        std::string temperature;
-        std::string forecast;
+    struct period_struct {
+        std::string time = "";
+        std::string start_time = "";
+        std::string period = "";
+        std::string forecast = "";
+        std::string temperature = "";
+        std::string icon = "";
+        bool isDaytime=false;
+        int lowTemperature = 0;
+        int highTemperature = 0;
     };
+
+    std::string formatHourAmPm(const std::string& datetime);
+    void addHourlyPeriod(json j);
+    void addsevenDayPeriod(json j);
 
     std::string city;
     std::string state;
 
-    forecast_struct currentForecast;
-    std::vector<forecast_struct> sevenDayForecast;
+    std::vector<period_struct> hourlyForecast;
+    std::vector<period_struct> sevenDayForecast;
+
+    int lowTemperature;
+    int highTemperature;
+
+    double latitude;
+    double longitude;
+
+    SunStatus sun_status;
 
 private:
 

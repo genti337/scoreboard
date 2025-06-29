@@ -25,12 +25,49 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
 
     //FIXME loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
     font.LoadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");
-    abbr_font.LoadFont("../rpi-rgb-led-matrix/fonts/6x13B.bdf");
+    temp_font.LoadFont("../rpi-rgb-led-matrix/fonts/9x18B.bdf");
     score_font.LoadFont("../rpi-rgb-led-matrix/fonts/7x14B.bdf");
-    small_font.LoadFont("../rpi-rgb-led-matrix/fonts/4x6.bdf");
+    small_font.LoadFont("../rpi-rgb-led-matrix/fonts/5x7.bdf");
+
 
     textColor = rgb_matrix::Color(255, 255, 255);  // Default: white
     bg_color = rgb_matrix::Color(0, 0, 0);  // Default: black
+
+    // Weather Icon Map 
+    weather_icon_map["skc"] = "sun";
+    weather_icon_map["few"] = "sun";
+    weather_icon_map["sct"] = "scattered_cloud";
+    weather_icon_map["bkn"] = "cloud";
+    weather_icon_map["ovc"] = "cloud";
+    weather_icon_map["wind_skc"] = "sun";
+    weather_icon_map["wind_few"] = "sun";
+    weather_icon_map["wind_sct"] = "scattered_cloud";
+    weather_icon_map["wind_bkn"] = "cloud";
+    weather_icon_map["wind_ovc"] = "cloud";
+    weather_icon_map["snow"] = "snow";
+    weather_icon_map["rain_snow"] = "snow";
+    weather_icon_map["rain_sleet"] = "snow";
+    weather_icon_map["snow_sleet"] = "snow";
+    weather_icon_map["fzra"] = "snow";
+    weather_icon_map["rain_fzra"] = "snow";
+    weather_icon_map["snow_fzra"] = "snow";
+    weather_icon_map["sleet"] = "snow";
+    weather_icon_map["rain"] = "rain";
+    weather_icon_map["rain_showers"] = "shower_rain";
+    weather_icon_map["rain_showers_hi"] = "shower_rain";
+    weather_icon_map["tsra"] = "storm";
+    weather_icon_map["tsra_sct"] = "storm";
+    weather_icon_map["tsra_hi"] = "storm";
+    weather_icon_map["tornado"] = "storm";
+    weather_icon_map["hurricane"] = "storm";
+    weather_icon_map["tropical_storm"] = "storm";
+    weather_icon_map["dust"] = "mist";
+    weather_icon_map["smoke"] = "mist";
+    weather_icon_map["haze"] = "mist";
+    weather_icon_map["hot"] = "hot";
+    weather_icon_map["cold"] = "cold";
+    weather_icon_map["blizzard"] = "snow";
+    weather_icon_map["fog"] = "mist";
 
     InitializeMagick(nullptr);
 
@@ -40,6 +77,7 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
 WeatherDisplay::~WeatherDisplay() {
     delete matrix;
 }
+
 
 void WeatherDisplay::loadFont(const std::string& font_path) {
     if (!font.LoadFont(font_path.c_str())) {
@@ -91,7 +129,7 @@ void WeatherDisplay::draw_text(const rgb_matrix::Font& font, const std::string& 
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
 }
 
-void WeatherDisplay::drawImage(Competition& competition, const std::string& path, int offset_x, int offset_y) {
+void WeatherDisplay::drawImage(const std::string& path, int offset_x, int offset_y) {
     Magick::Image image;
 
     try {
@@ -157,30 +195,71 @@ rgb_matrix::Color WeatherDisplay::brighterHex(const std::string& hex1, const std
     return (b1 > 50.0) ? color1 : color2;
 }
 
-// Format the Quator
-std::string WeatherDisplay::format_quarter_time(const std::string& shortDetail) {
-    if (shortDetail.find("Quarter") != std::string::npos) {
-        size_t dash_pos = shortDetail.find(" - ");
-        std::string quarter = shortDetail.substr(0, dash_pos);      // e.g., "3rd Quarter"
-        std::string time = shortDetail.substr(dash_pos + 3);        // e.g., "2:15"
+void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
+                                     const std::string& images_dir, int offset_x, int offset_y) {
+    std::string time_of_day = "";
+    std::string condition = "";
 
-        // Convert "3rd Quarter" -> "Q3"
-        std::string qnum = quarter.substr(0, 1);
-        return "Q" + qnum + "-" + time;
-    } else if (shortDetail == "Final") {
-        return "Final";
-    } else {
-        return shortDetail;  // fallback (e.g., "Wed, 8:00 PM")
+    std::ostringstream oss("");
+    oss << images_dir << "weather/";
+
+    std::cout << "Icon : " << icon << "\n";
+
+    std::size_t land_pos = icon.find("/land/");
+    if (land_pos != std::string::npos) {
+        std::string after_land = icon.substr(land_pos + 6); // skip "/land/"
+        std::size_t slash_pos = after_land.find('/');
+        //time_of_day = after_land.substr(0, slash_pos);
+        time_of_day = is_daytime ? "day" : "night";
+
+        std::size_t question_pos = after_land.find('?');
+        std::string raw_condition = after_land.substr(slash_pos + 1, question_pos - slash_pos - 1);
+
+        // ✅ Remove comma and modifiers (e.g., ",20")
+        std::size_t comma_pos = raw_condition.find(',');
+        if (comma_pos != std::string::npos)
+            condition = raw_condition.substr(0, comma_pos);
+        else
+            condition = raw_condition;
+
+        std::cout << "Time of day: " << time_of_day << std::endl;
+        std::cout << "Condition: " << condition << std::endl;
     }
+
+    oss << time_of_day << "_" << weather_icon_map[condition] << ".bmp";
+    drawImage(oss.str(), offset_x, offset_y);
 }
 
 void WeatherDisplay::render(std::vector<Weather>& weather_data, const std::string& images_dir) {
+    // Reset the Max Display X-Offset
+    max_display_x = 0;
+
     // Clear the Canvas for Update
     canvas->Clear();
 
-    // Weather Display
-    printf("%s\n", weather_data[0].city.c_str());
+    // Current Weather
     draw_text(font, weather_data[0].city, 0, 8, rgb_matrix::Color(255, 255, 255));
+    draw_text(temp_font, weather_data[0].hourlyForecast[0].temperature, 20, 26, rgb_matrix::Color(255, 255, 255));
+    draw_text(small_font, std::to_string(weather_data[0].lowTemperature), 50, 18, rgb_matrix::Color(0, 0, 255));
+    draw_text(small_font, std::to_string(weather_data[0].highTemperature), 50, 28, rgb_matrix::Color(255, 0, 0));
+
+    drawWeatherIcon(weather_data[0].hourlyForecast[0].icon, weather_data[0].hourlyForecast[0].isDaytime,
+                    images_dir, 0, 12);
+
+    // Hourly Forecast
+    std::cout << "Maximum X-Offset : " << max_display_x << std::endl;
+    int x_offset = max_display_x + 8;
+    for (int i=1; i<5; i++) {
+        draw_text(small_font, weather_data[0].hourlyForecast[i].time, x_offset, 6, rgb_matrix::Color(255, 255, 255));
+
+        drawWeatherIcon(weather_data[0].hourlyForecast[i].icon, weather_data[0].hourlyForecast[i].isDaytime,
+                        images_dir, x_offset, 8);
+
+        draw_text(small_font, weather_data[0].hourlyForecast[i].temperature, x_offset + 2, 32, rgb_matrix::Color(255, 255, 255));
+
+        // Increment the X-Offset
+        x_offset += 24;
+    }
 
     canvas = matrix->SwapOnVSync(canvas);
 

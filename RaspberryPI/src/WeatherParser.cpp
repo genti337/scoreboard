@@ -71,10 +71,17 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
         return;
     }
 
+    // LocationData
     data.city = j["properties"]["relativeLocation"]["properties"]["city"];
     data.state = j["properties"]["relativeLocation"]["properties"]["state"];
+    data.latitude = float(j["geometry"]["coordinates"][1]);
+    data.longitude = float(j["geometry"]["coordinates"][0]);
+
     std::string forecast_url = j["properties"]["forecast"];
     std::string hourly_url = j["properties"]["forecastHourly"];
+
+    std::cout << "\n\n\n" << forecast_url << "\n\n\n";
+    std::cout << "\n\n\n" << hourly_url << "\n\n\n";
 
     std::cout << "\n📍 Location: " << data.city << ", " << data.state << std::endl;
 
@@ -87,11 +94,11 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
         for (const auto& period : forecast["properties"]["periods"]) {
             std::cout << period["name"] << ": " << period["temperature"] << "°F, "
                  << period["shortForecast"] << std::endl;
-            Weather::forecast_struct forecast_data; 
+//            Weather::forecast_struct forecast_data; 
 //            forecast_data.period = period["name"];
 //            forecast_data.temperature = period["temperature"];
 //            forecast_data.forecast = period["forecast"];
-            data.sevenDayForecast.push_back(forecast_data);
+//            data.sevenDayForecast.push_back(forecast_data);
         }
     }
 
@@ -100,16 +107,43 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
     response = fetcher2.fetch();
     auto hourly = json::parse(response, nullptr, false);
     if (hourly.contains("properties") && hourly["properties"]["periods"].size() > 0) {
-        const auto& current = hourly["properties"]["periods"][0];
-        std::cout << "\n🌤️ Current Conditions:\n";
-        std::cout << "Time: " << current["startTime"] << std::endl;
-        std::cout << "Temperature: " << current["temperature"] << "°F\n";
-        std::cout << "Forecast: " << current["shortForecast"] << std::endl;
-//	data.currentForecast.time = current["startTime"];
-//	data.currentForecast.temperature = current["temperature"];
-//	data.currentForecast.forecast = current["shortForecast"];
+
+       std::cout << "\n🌤️ Hourly Forecast:\n";
+        for (const auto& period : hourly["properties"]["periods"]) {
+            std::cout << "Time: " << period["startTime"] << std::endl;
+            std::cout << "Temperature: " << period["temperature"] << "°F\n";
+            std::cout << "Forecast: " << period["shortForecast"] << std::endl;
+
+            data.addHourlyPeriod(period);
+
+            // Only Get Data for the Next 24 Hour Period
+            if (period["number"] >= 24) break;
+        }
+
     }
 
-    return;
+    // Return High and Low Temperatures for Current Day
+    std::ostringstream high_low_url;
+    high_low_url << "https://api.open-meteo.com/v1/forecast"
+        << "?latitude=" << j["geometry"]["coordinates"][1]
+        << "&longitude=" << j["geometry"]["coordinates"][0]
+        << "&daily=temperature_2m_max,temperature_2m_min"
+        << "&timezone=" << j["properties"]["timeZone"].get<std::string>();
 
+    std::cout << "\n\n\n High Low URL : " << high_low_url.str() << "\n\n\n";
+
+    FetchData feather3(high_low_url.str()); 
+    response = feather3.fetch();
+    j = json::parse(response);
+
+    data.lowTemperature = 999;
+    data.highTemperature = -999;
+    for (int i=0; i<int(j["daily"]["temperature_2m_min"].size()); i++) {
+        if (j["daily"]["temperature_2m_min"][i] < data.lowTemperature) data.lowTemperature = j["daily"]["temperature_2m_min"][i]; // * (9/5) + 32;
+        if (j["daily"]["temperature_2m_max"][i] > data.highTemperature) data.highTemperature = j["daily"]["temperature_2m_max"][i]; // * (9/5) + 32;
+    }
+    data.lowTemperature = int(float(data.lowTemperature) * (9.0/5.0)) + 32;
+    data.highTemperature = int(float(data.highTemperature) * (9.0/5.0)) + 32;
+
+    return;
 }

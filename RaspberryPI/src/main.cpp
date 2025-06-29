@@ -59,6 +59,8 @@ void fetch_loop(std::atomic<bool>& running,
             FetchData fetcher(url.str());
             std::string data = fetcher.fetch();
 
+            std::cout << "\n\n\n" << url.str() << "\n\n\n";
+
             Weather weather;
             weather_data.push_back(weather);
 
@@ -130,9 +132,9 @@ void display_loop(std::atomic<bool>& running,
         if (weather_display_active) {
             if (weather_data.size() > 0) {
     	        weather_display.render(weather_data, "../images/");
+                //std::this_thread::sleep_for(std::chrono::seconds(301));  // Fast update
             }
-
-            std::this_thread::sleep_for(std::chrono::seconds(5));  // Fast update
+                std::this_thread::sleep_for(std::chrono::seconds(15));  // Fast update
         } else {
 
             if (competition_index == 0 && competitions2.size() > 0) {
