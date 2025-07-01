@@ -57,9 +57,8 @@ bool SunStatus::getSunPositionStatus(const std::string& timestamp, double latitu
         return true;
     }
 
-    // Convert input local time to UTC
-    double local_time = hour + (minute / 60.0);
-    double utc_time = local_time + utc_offset;
+    // UTC Time
+    double utc_time = hour;
 
     double sunrise_utc = calculateSolarUTC(true, year, month, day, latitude, longitude);
     double sunset_utc  = calculateSolarUTC(false, year, month, day, latitude, longitude);

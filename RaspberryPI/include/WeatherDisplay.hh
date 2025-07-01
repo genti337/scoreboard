@@ -29,7 +29,7 @@ public:
     float getBrightness(const rgb_matrix::Color& color);
     rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void render(std::vector<Weather>& weather_data, const std::string& images_dir);
+    void render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir);
     void loadFont(const std::string& font_path);
 
 private:
@@ -44,8 +44,11 @@ private:
     std::string currentText;
    
     std::map<std::string, std::string> weather_icon_map;
+    std::map<std::string, std::string> day_abbr_map;
 
     int max_display_x;
+    int update_index;
+    int weather_index_lp;
 
     bool first_pass;
 };

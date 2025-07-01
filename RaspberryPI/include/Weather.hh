@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 #include <curl/curl.h>
+#include <regex>
+#include <iostream>
+
 #include <json-c/json.h>
 #include "../include/nlohmann/json.hpp"
 
@@ -17,18 +20,22 @@ public:
     ~Weather();
 
     struct period_struct {
+        std::string name = "";
         std::string time = "";
         std::string start_time = "";
         std::string period = "";
         std::string forecast = "";
         std::string temperature = "";
         std::string icon = "";
+        std::string precip_perc = "";
+        std::string short_forecast = "";
         bool isDaytime=false;
         int lowTemperature = 0;
         int highTemperature = 0;
     };
 
     std::string formatHourAmPm(const std::string& datetime);
+    std::string extractPrecipitationPercent(const std::string& forecast);
     void addHourlyPeriod(json j);
     void addsevenDayPeriod(json j);
 

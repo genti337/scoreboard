@@ -80,25 +80,19 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
     std::string forecast_url = j["properties"]["forecast"];
     std::string hourly_url = j["properties"]["forecastHourly"];
 
-    std::cout << "\n\n\n" << forecast_url << "\n\n\n";
-    std::cout << "\n\n\n" << hourly_url << "\n\n\n";
-
-    std::cout << "\n📍 Location: " << data.city << ", " << data.state << std::endl;
-
     // 7-day forecast
     FetchData feather1(forecast_url); 
     response = feather1.fetch();
     auto forecast = json::parse(response, nullptr, false);
     if (forecast.contains("properties")) {
-        std::cout << "\n📅 7-Day Forecast:\n";
         for (const auto& period : forecast["properties"]["periods"]) {
-            std::cout << period["name"] << ": " << period["temperature"] << "°F, "
-                 << period["shortForecast"] << std::endl;
-//            Weather::forecast_struct forecast_data; 
-//            forecast_data.period = period["name"];
-//            forecast_data.temperature = period["temperature"];
-//            forecast_data.forecast = period["forecast"];
-//            data.sevenDayForecast.push_back(forecast_data);
+            // Skip if the period is for today
+            std::string period_name = period["name"];
+            if (period_name.find("Today") != std::string::npos) continue;
+            if (period_name.find("Tonight") != std::string::npos) continue;
+            if (period_name.find("This") != std::string::npos) continue;
+
+            data.addsevenDayPeriod(period);
         }
     }
 
@@ -106,20 +100,14 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
     FetchData fetcher2(hourly_url); 
     response = fetcher2.fetch();
     auto hourly = json::parse(response, nullptr, false);
+    std::cout << "Hourly URL : " << hourly_url << std::endl; 
     if (hourly.contains("properties") && hourly["properties"]["periods"].size() > 0) {
-
-       std::cout << "\n🌤️ Hourly Forecast:\n";
         for (const auto& period : hourly["properties"]["periods"]) {
-            std::cout << "Time: " << period["startTime"] << std::endl;
-            std::cout << "Temperature: " << period["temperature"] << "°F\n";
-            std::cout << "Forecast: " << period["shortForecast"] << std::endl;
-
             data.addHourlyPeriod(period);
 
             // Only Get Data for the Next 24 Hour Period
             if (period["number"] >= 24) break;
         }
-
     }
 
     // Return High and Low Temperatures for Current Day
@@ -129,8 +117,6 @@ void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
         << "&longitude=" << j["geometry"]["coordinates"][0]
         << "&daily=temperature_2m_max,temperature_2m_min"
         << "&timezone=" << j["properties"]["timeZone"].get<std::string>();
-
-    std::cout << "\n\n\n High Low URL : " << high_low_url.str() << "\n\n\n";
 
     FetchData feather3(high_low_url.str()); 
     response = feather3.fetch();

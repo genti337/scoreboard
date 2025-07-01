@@ -28,15 +28,34 @@ std::string Weather::formatHourAmPm(const std::string& datetime) {
     return std::to_string(hour12) + period;
 }
 
+// Extract Precipitation Percentage
+std::string Weather::extractPrecipitationPercent(const std::string& forecast) {
+    std::regex pattern(R"(Chance of precipitation is (\d+)%|\b(\d+)% chance of precipitation\b)", std::regex::icase);
+    std::smatch match;
+
+    if (std::regex_search(forecast, match, pattern)) {
+        // Get the first matched numeric group
+        for (size_t i = 1; i < match.size(); ++i) {
+            if (match[i].matched)
+                return match[i].str() + "%";
+        }
+    }
+
+    return "0%";  // Return -1 if no percentage found
+}
+
 // Destructor
 void Weather::addHourlyPeriod(json j) {
    period_struct period;
 
-   period.time = j["startTime"];
    period.icon = j["icon"];
    period.isDaytime = j["isDaytime"];
    period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
    period.time = formatHourAmPm(j["startTime"]);
+   period.start_time = j["startTime"];
+   period.isDaytime = sun_status.getSunPositionStatus(period.start_time, latitude, longitude);
+   period.precip_perc = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
+   period.short_forecast = j["shortForecast"];
 
    hourlyForecast.push_back(period);
 
@@ -46,13 +65,16 @@ void Weather::addHourlyPeriod(json j) {
 void Weather::addsevenDayPeriod(json j) {
    period_struct period;
 
+   period.name = j["name"];
    period.icon = j["icon"];
    period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
    period.time = formatHourAmPm(j["startTime"]);
    period.start_time = j["startTime"];
-   period.isDaytime = sun_status.getSunPositionStatus(period.start_time, latitude, longitude);
+   period.isDaytime = (period.name.find("Night") !=std::string::npos) == false;
+   period.precip_perc = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
+   period.short_forecast = j["shortForecast"];
 
-   hourlyForecast.push_back(period);
+   sevenDayForecast.push_back(period);
 
    return;
 }

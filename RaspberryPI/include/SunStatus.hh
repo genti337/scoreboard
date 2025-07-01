@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdio>
 #include <cctype>
+#include <iostream>
 
 class SunStatus {
 public:
