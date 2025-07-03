@@ -27,7 +27,8 @@ public:
         std::string forecast = "";
         std::string temperature = "";
         std::string icon = "";
-        std::string precip_perc = "";
+        int precip_perc = 0;
+        std::string precip_perc_str = "";
         std::string short_forecast = "";
         bool isDaytime=false;
         int lowTemperature = 0;

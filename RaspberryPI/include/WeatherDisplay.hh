@@ -7,7 +7,6 @@
 
 #include "led-matrix.h"
 #include "graphics.h"
-#include "../include/Competition.hh"
 #include "../include/Weather.hh"
 #include <Magick++.h>
 
@@ -21,15 +20,16 @@ public:
     void setText(const std::string& text);
     void setColor(uint8_t r, uint8_t g, uint8_t b);
     int getTextWidth(const rgb_matrix::Font& font, const std::string& text);
-    void center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, int red=255, int green=255, int blue=255);
-    void center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, rgb_matrix::Color color);
+    void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, int red=255, int green=255, int blue=255);
+    void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, rgb_matrix::Color color);
     void draw_text(const rgb_matrix::Font& font, const std::string& text, int x, int y, rgb_matrix::Color color);
     void drawImage(const std::string& path, int offset_x = 0, int offset_y = 0);
     rgb_matrix::Color colorFromHex(const std::string& hex);
     float getBrightness(const rgb_matrix::Color& color);
     rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir);
+    int render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir);
+    void render_text(std::string text);
     void loadFont(const std::string& font_path);
 
 private:
@@ -49,6 +49,7 @@ private:
     int max_display_x;
     int update_index;
     int weather_index_lp;
+    int weather_index_out;
 
     bool first_pass;
 };

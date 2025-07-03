@@ -80,7 +80,8 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
     InitializeMagick(nullptr);
 
     first_pass = true;
-    update_index = 0;
+    update_index = -1;
+    weather_index_out = 0;
 }
 
 WeatherDisplay::~WeatherDisplay() {
@@ -111,7 +112,7 @@ int WeatherDisplay::getTextWidth(const rgb_matrix::Font& font, const std::string
     return width;
 }
 
-void WeatherDisplay::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
+void WeatherDisplay::center_text(const rgb_matrix::Font& font, const std::string& text,
                           int min_x, int max_x, int y,
                           int red, int green, int blue) {
     int text_width = getTextWidth(font, text);
@@ -121,7 +122,7 @@ void WeatherDisplay::center_text(Competition& competition, const rgb_matrix::Fon
     max_display_x = std::max(max_display_x, max_x);
 }
 
-void WeatherDisplay::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
+void WeatherDisplay::center_text(const rgb_matrix::Font& font, const std::string& text,
                           int min_x, int max_x, int y,
                           rgb_matrix::Color color) {
     int text_width = getTextWidth(font, text);
@@ -239,16 +240,18 @@ void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
     drawImage(oss.str(), offset_x, offset_y);
 }
 
-void WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir) {
+int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir) {
     // Display Update Index
-    if ((index != weather_index_lp) || (update_index >= 2)) {
+    if (update_index >= 2) {
        update_index = 0;
     } else {
        update_index += 1;
     }
 
-    std::cout << "Index : " << index << std::endl;
-    std::cout << "Update Index : " << update_index << std::endl;
+    // Weather Index
+    if (update_index == 2) weather_index_out = (weather_index_out + 1) % int(weather_data.size());     
+
+    std::cout << "Index : " << weather_index_out << " : " << update_index << std::endl;
 
     // Initialize X-Offset
     int x_offset = 0;
@@ -262,17 +265,14 @@ void WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data
     // Current Weather
     draw_text(font, city, 0, 8, rgb_matrix::Color(255, 255, 255));
     draw_text(temp_font, weather_data[index].hourlyForecast[0].temperature, 22, 26, rgb_matrix::Color(255, 255, 255));
-    //draw_text(small_font, weather_data[index].hourlyForecast[0].precip_perc, 24, 32, rgb_matrix::Color(100, 150, 230));
     draw_text(small_font, std::to_string(weather_data[index].lowTemperature) + "°", 52, 20, rgb_matrix::Color(0, 0, 255));
     draw_text(small_font, std::to_string(weather_data[index].highTemperature) + "°", 52, 30, rgb_matrix::Color(255, 0, 0));
 
     drawWeatherIcon(weather_data[index].hourlyForecast[0].icon, weather_data[index].hourlyForecast[0].isDaytime,
                     images_dir, 0, 10);
 
-    if (weather_data[index].hourlyForecast[0].short_forecast.find("Clear") != std::string::npos) {
-        // Nothing to do
-    } else {
-        draw_text(small_font, weather_data[index].hourlyForecast[0].precip_perc, 4, 32, rgb_matrix::Color(100, 150, 230));
+    if (weather_data[index].hourlyForecast[0].precip_perc > 20) {
+        draw_text(small_font, weather_data[index].hourlyForecast[0].precip_perc_str, 4, 32, rgb_matrix::Color(100, 150, 230));
     }
 
     // Hourly Forecast
@@ -284,7 +284,9 @@ void WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data
                         images_dir, x_offset, 8);
 
         if (update_index == 0) {
-            draw_text(small_font, weather_data[index].hourlyForecast[i].precip_perc, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
+            if (weather_data[index].hourlyForecast[i].precip_perc > 20) {
+                draw_text(small_font, weather_data[index].hourlyForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
+            }
         } else {
             draw_text(small_font, weather_data[index].hourlyForecast[i].temperature, x_offset + 2, 32, rgb_matrix::Color(255, 255, 255));
         }
@@ -302,11 +304,10 @@ void WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data
         drawWeatherIcon(weather_data[index].sevenDayForecast[i].icon, weather_data[index].sevenDayForecast[i].isDaytime,
                         images_dir, x_offset, 8);
 
-        std::cout << "Daytime : " << weather_data[index].sevenDayForecast[i].isDaytime << std::endl;
-        std::cout << "i : " << i << std::endl;
-
         if (update_index == 0) {
-            draw_text(small_font, weather_data[index].sevenDayForecast[i].precip_perc, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
+            if (weather_data[index].sevenDayForecast[i].precip_perc > 20) {
+                draw_text(small_font, weather_data[index].sevenDayForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
+            }
         } else if (update_index == 1) {
             draw_text(small_font, weather_data[index].sevenDayForecast[i+1].temperature, x_offset, 32, rgb_matrix::Color(0, 0, 255));
         } else if (update_index == 2) {
@@ -325,4 +326,20 @@ void WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data
 
     // Save the Last Pass for the Weather Index
     weather_index_lp = index;
+
+    // Output the Weather Index
+    return weather_index_out;
+}
+
+
+void WeatherDisplay::render_text(std::string text) {
+    // Clear the Canvas for Update
+    canvas->Clear();
+
+    center_text(temp_font, text, 0, 5*64, 16);
+
+    // Update the Canvas
+    canvas = matrix->SwapOnVSync(canvas);
+
+    return;
 }

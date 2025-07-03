@@ -54,7 +54,8 @@ void Weather::addHourlyPeriod(json j) {
    period.time = formatHourAmPm(j["startTime"]);
    period.start_time = j["startTime"];
    period.isDaytime = sun_status.getSunPositionStatus(period.start_time, latitude, longitude);
-   period.precip_perc = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
+   period.precip_perc = j["probabilityOfPrecipitation"]["value"];
+   period.precip_perc_str = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
    period.short_forecast = j["shortForecast"];
 
    hourlyForecast.push_back(period);
@@ -71,7 +72,8 @@ void Weather::addsevenDayPeriod(json j) {
    period.time = formatHourAmPm(j["startTime"]);
    period.start_time = j["startTime"];
    period.isDaytime = (period.name.find("Night") !=std::string::npos) == false;
-   period.precip_perc = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
+   period.precip_perc = j["probabilityOfPrecipitation"]["value"];
+   period.precip_perc_str = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
    period.short_forecast = j["shortForecast"];
 
    sevenDayForecast.push_back(period);
