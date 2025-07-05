@@ -16,8 +16,7 @@ public:
     std::string rank;	// Team Rank
     std::string color;  // Team Color
     std::string alt_color;  // Alternate Team Color
-
-    int conference_id;	// Team Conference ID
+    std::string conference_id;	// Team Conference ID
 
 private:
 

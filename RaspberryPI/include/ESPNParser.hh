@@ -19,13 +19,13 @@ public:
     std::string getTeamRecord(const json& team_json);
     std::string getTeamRank(const json& team_json);
     std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
-    void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league, std::vector<std::string>& conferences);
+    void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league, std::vector<std::string>& ext_conferences);
 
 private:
 //    std::string sport;
 //    std::string league;
 
-    std::unordered_map<int, std::string> ncaa_conferences;
+    std::unordered_map<std::string, std::unordered_map<std::string, std::string>> conferences;
 
 };
 

@@ -193,7 +193,7 @@ int main(int argc, char* argv[]) {
            weather_display_active = true;
        } else if (arg == "--city") {
            cities.push_back(argv[++i]);
-       } else if (arg == "--conferences") {
+       } else if (arg == "--conference") {
            conferences.push_back(argv[++i]);
        } else if (sport_args.find(arg) != sport_args.end()) {
            std::string flag(arg);

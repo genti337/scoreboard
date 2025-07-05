@@ -4,59 +4,53 @@
 
 // Constructor
 ESPNParser::ESPNParser() {
-    ncaa_conferences[1] = "American Athletic Conference";
-    ncaa_conferences[2] = "Atlantic Coast Conference";
-    ncaa_conferences[3] = "Big 12 Conference";
-    ncaa_conferences[4] = "Big Ten Conference";
-    ncaa_conferences[5] = "Conference USA";
-    ncaa_conferences[6] = "FBS Independents";
-    ncaa_conferences[7] = "Mid-American Conference";
-    ncaa_conferences[8] = "Mountain West Conference";
-    ncaa_conferences[9] = "Pac-12 Conference";
-    ncaa_conferences[10] ="Southeastern Conference";
-    ncaa_conferences[11] ="Sun Belt Conference";
-    
-//    std::unordered_map<int, std::string> getMLBDivisions() {
-//        return {
-//            {200, "American League"},
-//            {201, "National League"},
-//            {1,   "AL East"},
-//            {2,   "AL Central"},
-//            {3,   "AL West"},
-//            {4,   "NL East"},
-//            {5,   "NL Central"},
-//            {6,   "NL West"}
-//        };
-//    }
-//    
-//    
-//    std::unordered_map<int, std::string> getNFLDivisions() {
-//        return {
-//            {8,  "NFL"},
-//            {1,  "AFC East"},
-//            {2,  "AFC North"},
-//            {3,  "AFC South"},
-//            {4,  "AFC West"},
-//            {5,  "NFC East"},
-//            {6,  "NFC North"},
-//            {7,  "NFC South"},
-//            {9,  "NFC West"}
-//        };
-//    }
-//
-//    std::unordered_map<int, std::string> getNBADivisions() {
-//        return {
-//            {13, "Eastern Conference"},
-//            {14, "Western Conference"},
-//            {1,  "Atlantic Division"},
-//            {2,  "Central Division"},
-//            {3,  "Southeast Division"},
-//            {4,  "Northwest Division"},
-//            {5,  "Pacific Division"},
-//            {6,  "Southwest Division"}
-//        };
-//    }
 
+    std::unordered_map<std::string, std::string> ncaa_conferences;
+    ncaa_conferences["1"] = "ACC";
+    ncaa_conferences["4"] = "Big 12";
+    ncaa_conferences["5"] = "Big Ten";
+    ncaa_conferences["7"] = "CUSA";
+    ncaa_conferences["8"] = "SEC";
+    ncaa_conferences["9"] = "Pac-12";
+    ncaa_conferences["10"] = "AAC";
+    ncaa_conferences["7"] = "MAC";
+    ncaa_conferences["13"] = "Sun Belt";
+    ncaa_conferences["12"] = "MWC";
+    conferences["college-football"] = ncaa_conferences;
+    
+    std::unordered_map<std::string, std::string> mlb_conferences;
+    mlb_conferences["200"] = "American League";
+    mlb_conferences["201"] = "National League";
+    mlb_conferences["1"] = "AL East";
+    mlb_conferences["2"] = "AL Central";
+    mlb_conferences["3"] = "AL West";
+    mlb_conferences["4"] = "NL East";
+    mlb_conferences["5"] = "NL Central";
+    mlb_conferences["6"] = "NL West";
+    conferences["mlb"] = mlb_conferences;
+
+    std::unordered_map<std::string, std::string> nfl_conferences;
+    nfl_conferences["8"] = "NFL";
+    nfl_conferences["1"] = "AFC East";
+    nfl_conferences["2"] = "AFC North";
+    nfl_conferences["3"] = "AFC South";
+    nfl_conferences["4"] = "AFC West";
+    nfl_conferences["5"] = "NFC East";
+    nfl_conferences["6"] = "NFC North";
+    nfl_conferences["7"] = "NFC South";
+    nfl_conferences["9"] = "NFC West";
+    conferences["nlf"] = nfl_conferences;
+
+    std::unordered_map<std::string, std::string> nba_conferences;
+    nba_conferences["13"] = "Eastern Conference";
+    nba_conferences["14"] = "Western Conference";
+    nba_conferences["1"] =  "Atlantic Division";
+    nba_conferences["2"] =  "Central Division";
+    nba_conferences["3"] =  "Southeast Division";
+    nba_conferences["4"] =  "Northwest Division";
+    nba_conferences["5"] =  "Pacific Division";
+    nba_conferences["6"] =  "Southwest Division";
+    conferences["nba"] = nba_conferences;
 }
 
 // Destructor
@@ -148,7 +142,7 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                                      std::vector<Competition>& competitions,
                                      std::string& sport,
                                      std::string& league,
-                                     std::vector<std::string>& conferences) {
+                                     std::vector<std::string>& ext_conferences) {
     json j = json::parse(jsonStr);
 
     if (!j.contains("events")) return;
@@ -188,8 +182,11 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                    game.HomeTeam.rank = getTeamRank(team);
                    game.HomeTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
                    game.HomeTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
-                   //game.HomeTeam.conference_id = team["team"]["conferenceId"];
-                   //std::cout << team["team"]["conferenceId"] << std::endl;
+                   if (league == "college-football") {
+                       game.HomeTeam.conference_id = team["team"]["conferenceId"];
+                   } else {
+                       game.HomeTeam.conference_id = "0";
+                   }
                 } else {
                    game.AwayTeam.abbr = team["team"]["abbreviation"];
                    game.AwayTeam.score = team["score"];
@@ -197,8 +194,11 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                    game.AwayTeam.rank = getTeamRank(team);
                    game.AwayTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
                    game.AwayTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
-                   //game.AwayTeam.conference_id = team["team"]["conferenceId"];
-                   //std::cout << team["team"]["conferenceId"] << std::endl;
+                   if (league == "college-football") {
+                       game.AwayTeam.conference_id = team["team"]["conferenceId"];
+                   } else {
+                       game.AwayTeam.conference_id = "0";
+                   }
                 }
             }
 
@@ -216,7 +216,17 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 }
             }
 
-            competitions.push_back(game);
+            if ((int(ext_conferences.size()) > 0) && (league == "college-football")) {
+               for (int j=0; j<int(ext_conferences.size()); j++) {
+                   if (ext_conferences[j] == conferences[league][game.HomeTeam.conference_id]
+                    || ext_conferences[j] == conferences[league][game.AwayTeam.conference_id]) {
+                       competitions.push_back(game);
+                       break;
+                   }
+               }
+            } else {
+                competitions.push_back(game);
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "Failed to parse JSON: " << e.what() << std::endl;

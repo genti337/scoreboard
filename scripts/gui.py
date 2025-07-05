@@ -89,9 +89,7 @@ HTML = """
       if (document.getElementById("ncaaf").checked) sports.push("ncaaf");
 
       const mockConfs = {
-        mlb: ["AL", "NL"],
-        nba: ["Eastern", "Western"],
-        ncaaf: ["SEC", "Big Ten", "ACC", "Pac-12"]
+        ncaaf: ["ACC", "Big 12", "Big Ten", "CUSA", "SEC", "Pac-12", "AAC", "MAC", "Sun Belt", "MWC"]
       };
 
       for (const sport of sports) {
