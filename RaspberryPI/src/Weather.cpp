@@ -28,6 +28,26 @@ std::string Weather::formatHourAmPm(const std::string& datetime) {
     return std::to_string(hour12) + period;
 }
 
+// Extract the Day of the Week
+std::string Weather::getDayOfWeek(const std::string& iso_datetime) {
+    std::tm tm = {};
+    std::istringstream ss(iso_datetime);
+
+    // Parse ISO 8601 datetime, ignore timezone
+    ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+    if (ss.fail()) {
+        return "ERR";
+    }
+
+    // Convert to time_t to compute weekday
+    std::mktime(&tm);
+
+    // Format weekday abbreviation
+    char buffer[4];
+    std::strftime(buffer, sizeof(buffer), "%a", &tm);  // e.g., "Mon"
+    return std::string(buffer);
+}
+
 // Extract Precipitation Percentage
 std::string Weather::extractPrecipitationPercent(const std::string& forecast) {
     std::regex pattern(R"(Chance of precipitation is (\d+)%|\b(\d+)% chance of precipitation\b)", std::regex::icase);
@@ -52,6 +72,7 @@ void Weather::addHourlyPeriod(json j) {
    period.isDaytime = j["isDaytime"];
    period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
    period.time = formatHourAmPm(j["startTime"]);
+   period.day = getDayOfWeek(j["startTime"]);
    period.start_time = j["startTime"];
    period.isDaytime = sun_status.getSunPositionStatus(period.start_time, latitude, longitude);
    period.precip_perc = j["probabilityOfPrecipitation"]["value"];
@@ -70,6 +91,7 @@ void Weather::addsevenDayPeriod(json j) {
    period.icon = j["icon"];
    period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
    period.time = formatHourAmPm(j["startTime"]);
+   period.day = getDayOfWeek(j["startTime"]);
    period.start_time = j["startTime"];
    period.isDaytime = (period.name.find("Night") !=std::string::npos) == false;
    period.precip_perc = j["probabilityOfPrecipitation"]["value"];

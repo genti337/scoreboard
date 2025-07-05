@@ -44,7 +44,6 @@ private:
     std::string currentText;
    
     std::map<std::string, std::string> weather_icon_map;
-    std::map<std::string, std::string> day_abbr_map;
 
     int max_display_x;
     int update_index;

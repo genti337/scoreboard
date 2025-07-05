@@ -68,15 +68,6 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
     weather_icon_map["blizzard"] = "snow";
     weather_icon_map["fog"] = "mist";
 
-    // Day Abbreviation Map
-    day_abbr_map["Monday"] = "Mon";
-    day_abbr_map["Tuesday"] = "Tue";
-    day_abbr_map["Wednesday"] = "Wed";
-    day_abbr_map["Thursday"] = "Thu";
-    day_abbr_map["Friday"] = "Fri";
-    day_abbr_map["Saturday"] = "Sat";
-    day_abbr_map["Sunday"] = "Sun";
-
     InitializeMagick(nullptr);
 
     first_pass = true;
@@ -298,7 +289,7 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
     // Seven Day Forecast
     x_offset = max_display_x + 32;
     for (int i=0; i<10; i+=2) {
-        draw_text(small_font, day_abbr_map[weather_data[index].sevenDayForecast[i].name],
+        draw_text(small_font, weather_data[index].sevenDayForecast[i].day,
                   x_offset, 6, rgb_matrix::Color(255, 255, 255));
 
         drawWeatherIcon(weather_data[index].sevenDayForecast[i].icon, weather_data[index].sevenDayForecast[i].isDaytime,

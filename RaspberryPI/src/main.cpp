@@ -44,6 +44,7 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<Weather>& weather_data1,
                 std::vector<Weather>& weather_data2,
                 std::vector<std::string>& sports,
+                std::vector<std::string>& conferences,
                 std::vector<std::string>& leagues,
                 std::vector<std::string>& cities,
                 bool weather_display_active) {
@@ -98,12 +99,12 @@ void fetch_loop(std::atomic<bool>& running,
                        if (i == 0) {
                           competitions1.clear();
                        }
-                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i]);
+                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i], std::ref(conferences));
                    } else {
                        if (i == 0) {
                           competitions2.clear();
                        }
-                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i]);
+                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i], std::ref(conferences));
                    }
    
                    std::cout << "Length of competitions: " << competitions1.size() << std::endl;
@@ -170,11 +171,13 @@ void display_loop(std::atomic<bool>& running,
 }
 
 int main(int argc, char* argv[]) {
-    std::unordered_map<std::string, std::pair<std::string, std::string>> inputArgs = {
+    std::unordered_map<std::string, std::pair<std::string, std::string>> sport_args = {
        {"--nba", {"basketball", "nba"}},
        {"--mlb", {"baseball", "mlb"}},
        {"--ncaaf", {"football", "college-football"}},
     };
+    std::vector<std::string> cities;
+    std::vector<std::string> conferences;
 
     bool weather_display_active = false;
     std::vector<std::string> sports;
@@ -188,12 +191,19 @@ int main(int argc, char* argv[]) {
 
        if (arg == "--weather_display") {
            weather_display_active = true;
-           break;
-       } else {
+       } else if (arg == "--city") {
+           cities.push_back(argv[++i]);
+       } else if (arg == "--conferences") {
+           conferences.push_back(argv[++i]);
+       } else if (sport_args.find(arg) != sport_args.end()) {
            std::string flag(arg);
-           sports.push_back(inputArgs[flag].first);
-           leagues.push_back(inputArgs[flag].second);
+           sports.push_back(sport_args[flag].first);
+           leagues.push_back(sport_args[flag].second);
        }
+    }
+
+    for (int i=0; i<int(cities.size()); i++) {
+       std::cout << cities[i] << std::endl;
     }
 
     ESPNParser parser;   // ESPN Parser Class
@@ -206,11 +216,6 @@ int main(int argc, char* argv[]) {
     std::vector<Competition> competitions2;
     std::vector<Weather> weather_data1;
     std::vector<Weather> weather_data2;
-
-    std::vector<std::string> cities;
-    cities.push_back("League City");
-    cities.push_back("Omaha");
-    cities.push_back("Tampa");
 
     // Resize the Weather Data Vector
     weather_data1.resize(int(cities.size()));
@@ -246,6 +251,7 @@ int main(int argc, char* argv[]) {
                             std::ref(weather_data1),
                             std::ref(weather_data2),
                             std::ref(sports), 
+                            std::ref(conferences), 
                             std::ref(leagues),
                             std::ref(cities),
                             weather_display_active);

@@ -4,7 +4,59 @@
 
 // Constructor
 ESPNParser::ESPNParser() {
-   //TODO
+    ncaa_conferences[1] = "American Athletic Conference";
+    ncaa_conferences[2] = "Atlantic Coast Conference";
+    ncaa_conferences[3] = "Big 12 Conference";
+    ncaa_conferences[4] = "Big Ten Conference";
+    ncaa_conferences[5] = "Conference USA";
+    ncaa_conferences[6] = "FBS Independents";
+    ncaa_conferences[7] = "Mid-American Conference";
+    ncaa_conferences[8] = "Mountain West Conference";
+    ncaa_conferences[9] = "Pac-12 Conference";
+    ncaa_conferences[10] ="Southeastern Conference";
+    ncaa_conferences[11] ="Sun Belt Conference";
+    
+//    std::unordered_map<int, std::string> getMLBDivisions() {
+//        return {
+//            {200, "American League"},
+//            {201, "National League"},
+//            {1,   "AL East"},
+//            {2,   "AL Central"},
+//            {3,   "AL West"},
+//            {4,   "NL East"},
+//            {5,   "NL Central"},
+//            {6,   "NL West"}
+//        };
+//    }
+//    
+//    
+//    std::unordered_map<int, std::string> getNFLDivisions() {
+//        return {
+//            {8,  "NFL"},
+//            {1,  "AFC East"},
+//            {2,  "AFC North"},
+//            {3,  "AFC South"},
+//            {4,  "AFC West"},
+//            {5,  "NFC East"},
+//            {6,  "NFC North"},
+//            {7,  "NFC South"},
+//            {9,  "NFC West"}
+//        };
+//    }
+//
+//    std::unordered_map<int, std::string> getNBADivisions() {
+//        return {
+//            {13, "Eastern Conference"},
+//            {14, "Western Conference"},
+//            {1,  "Atlantic Division"},
+//            {2,  "Central Division"},
+//            {3,  "Southeast Division"},
+//            {4,  "Northwest Division"},
+//            {5,  "Pacific Division"},
+//            {6,  "Southwest Division"}
+//        };
+//    }
+
 }
 
 // Destructor
@@ -92,9 +144,11 @@ std::tuple<std::string, std::string, std::string> ESPNParser::convertToLocalTime
 }
 
 // ESPN Scoreboard Parser
-void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league) {
-//    std::vector<Competition> competitions;
-
+void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
+                                     std::vector<Competition>& competitions,
+                                     std::string& sport,
+                                     std::string& league,
+                                     std::vector<std::string>& conferences) {
     json j = json::parse(jsonStr);
 
     if (!j.contains("events")) return;
@@ -134,7 +188,8 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
                    game.HomeTeam.rank = getTeamRank(team);
                    game.HomeTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
                    game.HomeTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
-                   printf("%s\n", game.HomeTeam.color.c_str());
+                   //game.HomeTeam.conference_id = team["team"]["conferenceId"];
+                   //std::cout << team["team"]["conferenceId"] << std::endl;
                 } else {
                    game.AwayTeam.abbr = team["team"]["abbreviation"];
                    game.AwayTeam.score = team["score"];
@@ -142,6 +197,8 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
                    game.AwayTeam.rank = getTeamRank(team);
                    game.AwayTeam.color = team["team"].contains("color") ? team["team"]["color"] : "FFFFFF";
                    game.AwayTeam.alt_color = team["team"].contains("alternateColor") ? team["team"]["alternateColor"] : "000000";
+                   //game.AwayTeam.conference_id = team["team"]["conferenceId"];
+                   //std::cout << team["team"]["conferenceId"] << std::endl;
                 }
             }
 
@@ -166,5 +223,4 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr, std::vector<Com
     }
 
     return;
-
 }

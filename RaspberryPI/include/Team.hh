@@ -17,6 +17,8 @@ public:
     std::string color;  // Team Color
     std::string alt_color;  // Alternate Team Color
 
+    int conference_id;	// Team Conference ID
+
 private:
 
 };

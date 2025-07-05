@@ -22,6 +22,7 @@ public:
     struct period_struct {
         std::string name = "";
         std::string time = "";
+        std::string day = "";
         std::string start_time = "";
         std::string period = "";
         std::string forecast = "";
@@ -36,6 +37,7 @@ public:
     };
 
     std::string formatHourAmPm(const std::string& datetime);
+    std::string getDayOfWeek(const std::string& iso_datetime);
     std::string extractPrecipitationPercent(const std::string& forecast);
     void addHourlyPeriod(json j);
     void addsevenDayPeriod(json j);
