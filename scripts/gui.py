@@ -41,6 +41,7 @@ HTML = """
   <select id="display-mode" onchange="handleModeChange()" style="font-size: 18px; margin-top: 10px;">
     <option value="sports">Sports</option>
     <option value="weather">Weather Display</option>
+    <option value="countdown">Countdown</option>
   </select>
 
   <div id="sports-wrapper">
@@ -63,14 +64,17 @@ HTML = """
     <div id="city-list"></div>
   </div>
 
-  <div id="city-modal" class="modal hidden">
-    <div class="modal-content">
-      <span class="modal-close" onclick="closeCityModal()">&times;</span>
-      <h3>Add a City</h3>
-      <input type="text" id="city-input" placeholder="Enter city name" />
-      <br><br>
-      <button onclick="addCity()">Add</button>
-    </div>
+  <div id="countdown-wrapper" class="hidden">
+    <div class="section-label">Countdown Target</div>
+    <input type="text" id="countdown-event" placeholder="Event Name">
+    <br><br>
+    <input type="text" id="countdown-month" placeholder="Month (1-12)">
+    <br><br>
+    <input type="text" id="countdown-day" placeholder="Day (1-31)">
+    <br><br>
+    <input type="text" id="countdown-hour" placeholder="Hour (0-23)">
+    <br><br>
+    <input type="text" id="countdown-minute" placeholder="Minute (0-59)">
   </div>
 
   <div id="temp">Temperature: Loading...</div>
@@ -140,7 +144,17 @@ HTML = """
           }
         });
 
-        fetch("/start?" + mlb + nba + ncaaf + modeArg + cityArgs + confArgs)
+        let countdownArgs = "";
+        if (mode === "countdown") {
+          const event = document.getElementById("countdown-event").value.trim();
+          const month = document.getElementById("countdown-month").value.trim();
+          const day = document.getElementById("countdown-day").value.trim();
+          const hour = document.getElementById("countdown-hour").value.trim();
+          const minute = document.getElementById("countdown-minute").value.trim();
+          countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}`;
+        }
+
+        fetch("/start?" + mlb + nba + ncaaf + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -159,58 +173,25 @@ HTML = """
     function handleModeChange() {
       const mode = document.getElementById("display-mode").value;
       const isWeather = (mode === "weather");
-      document.getElementById("sports-wrapper").classList.toggle("hidden", isWeather);
+      const isCountdown = (mode === "countdown");
+
+      document.getElementById("sports-wrapper").classList.toggle("hidden", isWeather || isCountdown);
       document.getElementById("weather-wrapper").classList.toggle("hidden", !isWeather);
-      document.getElementById("conference-wrapper").classList.toggle("hidden", isWeather);
-      if (!isWeather) updateConferenceSection();
+      document.getElementById("conference-wrapper").classList.toggle("hidden", isWeather || isCountdown);
+      document.getElementById("countdown-wrapper").classList.toggle("hidden", !isCountdown);
+
+      if (!isWeather && !isCountdown) updateConferenceSection();
     }
 
     function updateTemp() {
-      console.log("Calling /temperature...");
       fetch("/temperature")
         .then(res => res.json())
         .then(data => {
-          console.log("Temp response:", data);
           document.getElementById("temp").textContent = "Temperature: " + data.temp_f + "°F";
         })
         .catch(err => {
-          console.error("Failed to fetch temperature:", err);
           document.getElementById("temp").textContent = "Temperature: N/A";
         });
-    }
-
-    function openCityModal() {
-      document.getElementById("city-input").value = "";
-      document.getElementById("city-modal").classList.remove("hidden");
-    }
-
-    function closeCityModal() {
-      document.getElementById("city-modal").classList.add("hidden");
-    }
-
-    function addCity() {
-      const city = document.getElementById("city-input").value.trim();
-      if (city.length > 0 && !cityList.includes(city)) {
-        cityList.push(city);
-        updateCityListDisplay();
-      }
-      closeCityModal();
-    }
-
-    function removeCity(city) {
-      cityList = cityList.filter(c => c !== city);
-      updateCityListDisplay();
-    }
-
-    function updateCityListDisplay() {
-      const container = document.getElementById("city-list");
-      container.innerHTML = "";
-      for (const city of cityList) {
-        const div = document.createElement("div");
-        div.className = "city-tag";
-        div.innerHTML = city + ' <span class="remove-city" onclick="removeCity(\\'' + city + '\\')">&times;</span>';
-        container.appendChild(div);
-      }
     }
 
     window.onload = function () {
@@ -224,11 +205,11 @@ HTML = """
 </html>
 """
 
+process = None
+
 @app.route("/")
 def index():
     return render_template_string(HTML)
-
-process = None
 
 @app.route("/start")
 def start_app():
@@ -248,10 +229,24 @@ def start_app():
             cmd.append("--nba")
         if ncaaf:
             cmd.append("--ncaaf")
+
         if mode == "weather":
             cmd.append("--weather_display")
             for city in cities:
                 cmd += ["--city", city]
+
+        elif mode == "countdown":
+            cmd.append("--countdown_display")
+            event = request.args.get("event")
+            month = request.args.get("month")
+            day = request.args.get("day")
+            hour = request.args.get("hour")
+            minute = request.args.get("minute")
+            if event:
+                cmd += ["--event", event]
+            if month and day and hour and minute:
+                cmd += ["--month", month, "--day", day, "--hour", hour, "--minute", minute]
+
         for conf_entry in conferences:
             if '|' in conf_entry:
                 conf, sport = conf_entry.split("|", 1)

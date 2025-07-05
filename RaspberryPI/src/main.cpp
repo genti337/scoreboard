@@ -3,6 +3,7 @@
 #include "../include/WeatherParser.hh"
 #include "../include/Display.hh"
 #include "../include/WeatherDisplay.hh"
+#include "../include/CountdownDisplay.hh"
 
 #include <json-c/json.h>
 #include <iostream>
@@ -13,6 +14,12 @@
 #include <unordered_map>
 #include <ctime>
 #include <chrono>
+
+int month = 1;
+int day = 1;
+int hour = 0;
+int minute = 0;
+std::string event_name = "";
 
 bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
     CURL* curl = curl_easy_init();
@@ -47,12 +54,12 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& conferences,
                 std::vector<std::string>& leagues,
                 std::vector<std::string>& cities,
-                bool weather_display_active) {
+                std::string active_display) {
 
     while (running) {
         printf("Fetching Data!\n");
 
-        if (weather_display_active) {
+        if (active_display == "weather") {
 	    for (int i=0; i<int(cities.size()); i++) {
                 double lat, lon;
                 getCoordinatesFromCity(cities[i], lat, lon);
@@ -83,7 +90,7 @@ void fetch_loop(std::atomic<bool>& running,
             std::this_thread::sleep_for(std::chrono::seconds(300));  // Update every 10 min
             //std::this_thread::sleep_for(std::chrono::seconds(5));  // Update every 10 min
 
-        } else {
+        } else if (active_display == "sports") {
 
             //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
             for (int i=0; i<int(sports.size()); i++) {
@@ -121,6 +128,8 @@ void fetch_loop(std::atomic<bool>& running,
             }
 
             std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
+        } else {
+            return;
         }
 
         printf("Finished fetching data!\n");
@@ -132,6 +141,7 @@ void fetch_loop(std::atomic<bool>& running,
 void display_loop(std::atomic<bool>& running,
                   Display& display,
                   WeatherDisplay& weather_display,
+                  CountdownDisplay& countdown_display,
                   int& update_index,
                   int& weather_index,
                   std::vector<Competition>& competitions1,
@@ -139,11 +149,11 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Weather>& weather_data1,
                   std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
-                  bool weather_display_active) {
+                  std::string active_display) {
     printf("Updating Display!\n");
 
     while (running) {
-        if (weather_display_active) {
+        if (active_display == "weather") {
             if (update_index == 0) {
                weather_index = weather_display.render(cities[weather_index], weather_data2, weather_index, "../images/");
             } else if (update_index == 1) {
@@ -155,6 +165,9 @@ void display_loop(std::atomic<bool>& running,
             std::cout << "Updated weather index : " << weather_index << std::endl;
 
             std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
+        } else if (active_display == "countdown") {
+    	    countdown_display.render(month, day, hour, minute, event_name);
+            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
@@ -179,7 +192,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> cities;
     std::vector<std::string> conferences;
 
-    bool weather_display_active = false;
+    std::string active_display = "";
     std::vector<std::string> sports;
     std::vector<std::string> leagues;
 
@@ -190,7 +203,19 @@ int main(int argc, char* argv[]) {
        std::cout << arg << std::endl;
 
        if (arg == "--weather_display") {
-           weather_display_active = true;
+           active_display = "weather";
+       } else if (arg == "--countdown_display") {
+           active_display = "countdown";
+       } else if (arg == "--month") {
+           month = std::stoi(argv[++i]);
+       } else if (arg == "--day") {
+           day = std::stoi(argv[++i]);
+       } else if (arg == "--hour") {
+           hour = std::stoi(argv[++i]);
+       } else if (arg == "--minute") {
+           minute = std::stoi(argv[++i]);
+       } else if (arg == "--event") {
+           event_name = argv[++i];
        } else if (arg == "--city") {
            cities.push_back(argv[++i]);
        } else if (arg == "--conference") {
@@ -199,6 +224,7 @@ int main(int argc, char* argv[]) {
            std::string flag(arg);
            sports.push_back(sport_args[flag].first);
            leagues.push_back(sport_args[flag].second);
+           active_display = "sports";
        }
     }
 
@@ -208,8 +234,9 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    Display display(32, 64, 5, "adafruit-hat", !weather_display_active);
-    WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", weather_display_active);
+    Display display(32, 64, 5, "adafruit-hat", active_display == "sports");
+    WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
+    CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     int update_index = -1;
     int weather_index = 0;
     std::vector<Competition> competitions1;
@@ -232,6 +259,7 @@ int main(int argc, char* argv[]) {
                               std::ref(running),
                               std::ref(display),
                               std::ref(weather_display),
+                              std::ref(countdown_display),
                               std::ref(update_index),
                               std::ref(weather_index),
                               std::ref(competitions1),
@@ -239,7 +267,7 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_data1),
                               std::ref(weather_data2),
                               std::ref(cities),
-                              weather_display_active);
+                              active_display);
 
     std::thread fetchThread(fetch_loop,
                             std::ref(running),
@@ -254,7 +282,7 @@ int main(int argc, char* argv[]) {
                             std::ref(conferences), 
                             std::ref(leagues),
                             std::ref(cities),
-                            weather_display_active);
+                            active_display);
 
     std::cout << "Press Enter to stop..." << std::endl;
     std::cin.get();  // Wait for user input
