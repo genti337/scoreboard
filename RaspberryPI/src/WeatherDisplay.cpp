@@ -327,7 +327,7 @@ void WeatherDisplay::render_text(std::string text) {
     // Clear the Canvas for Update
     canvas->Clear();
 
-    center_text(temp_font, text, 0, 5*64, 16);
+    center_text(temp_font, text, 0, 5*64, 20);
 
     // Update the Canvas
     canvas = matrix->SwapOnVSync(canvas);

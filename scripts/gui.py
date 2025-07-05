@@ -14,7 +14,7 @@ HTML = """
     button { font-size: 20px; padding: 10px 40px; margin: 20px; }
     .section-label { font-size: 20px; font-weight: bold; margin-top: 20px; }
     .checkbox-group label { font-size: 18px; display: block; margin: 4px 0; }
-    input[type="text"], input[type="datetime-local"] {
+    input[type="text"], input[type="datetime-local"], select {
       font-size: 18px; padding: 6px; width: 80%;
     }
     #temp { font-size: 18px; margin-top: 30px; color: #555; }
@@ -78,6 +78,15 @@ HTML = """
 
   <div id="countdown-wrapper" class="hidden">
     <div class="section-label">Countdown Target</div>
+    <label for="holiday-preset">Holiday Preset:</label>
+    <select id="holiday-preset" onchange="setHolidayCountdown()">
+      <option value="">-- Select a Holiday --</option>
+      <option value="christmas">🎄 Christmas</option>
+      <option value="easter">🐣 Easter</option>
+      <option value="halloween">🎃 Halloween</option>
+      <option value="newyear">🎆 New Year</option>
+    </select>
+    <br><br>
     <input type="text" id="countdown-event" placeholder="Event Name">
     <br><br>
     <input type="datetime-local" id="countdown-datetime">
@@ -237,6 +246,57 @@ HTML = """
         div.innerHTML = city + ' <span class="remove-city" onclick="removeCity(\\'' + city + '\\')">&times;</span>';
         container.appendChild(div);
       }
+    }
+
+    function setHolidayCountdown() {
+      const preset = document.getElementById("holiday-preset").value;
+      const eventInput = document.getElementById("countdown-event");
+      const datetimeInput = document.getElementById("countdown-datetime");
+
+      const now = new Date();
+      const year = now.getFullYear();
+      let targetDate = null;
+      let eventName = "";
+
+      switch (preset) {
+        case "christmas":
+          eventName = "Christmas";
+          targetDate = new Date(year, 11, 25, 0, 0);
+          break;
+        case "easter":
+          eventName = "Easter";
+          targetDate = calculateEasterDate(year);
+          break;
+        case "halloween":
+          eventName = "Halloween";
+          targetDate = new Date(year, 9, 31, 0, 0);
+          break;
+        case "newyear":
+          eventName = "New Year";
+          targetDate = new Date(year + 1, 0, 1, 0, 0);
+          break;
+        default:
+          return;
+      }
+
+      if (targetDate) {
+        const isoString = targetDate.toISOString().slice(0, 16);
+        datetimeInput.value = isoString;
+        eventInput.value = eventName;
+      }
+    }
+
+    function calculateEasterDate(year) {
+      const f = Math.floor;
+      const G = year % 19;
+      const C = f(year / 100);
+      const H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30;
+      const I = H - f(H / 28) * (1 - f(29 / (H + 1)) * f((21 - G) / 11));
+      const J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7;
+      const L = I - J;
+      const month = 3 + f((L + 40) / 44);
+      const day = L + 28 - 31 * f(month / 4);
+      return new Date(year, month - 1, day, 0, 0);
     }
 
     window.onload = function () {

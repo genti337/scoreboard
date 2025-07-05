@@ -35,6 +35,16 @@ CountdownDisplay::CountdownDisplay(int rows, int cols, int chain_length, const s
     InitializeMagick(nullptr);
 
     first_pass = true;
+
+    // Images Map
+    images_map["CampingLeft"] = "../images/tent.bmp";
+    images_map["CampingRight"] = "../images/camp_fire.bmp";
+    images_map["HalloweenLeft"] = "../images/pumpkin.bmp";
+    images_map["HalloweenRight"] = "../images/headstone.bmp";
+    images_map["ChristmasLeft"] = "../images/christmas_tree.bmp";
+    images_map["ChristmasRight"] = "../images/christmas_stocking.bmp";
+    images_map["EasterLeft"] = "../images/easter_rabbit.bmp";
+    images_map["EasterRight"] = "../images/easter_egg.bmp";
 }
 
 CountdownDisplay::~CountdownDisplay() {
@@ -188,13 +198,21 @@ void CountdownDisplay::render(int month, int day, int hour, int minute, std::str
     // Retrieve the Time Until the Event
     time_until_event = time_until(month, day, hour, minute);
 
+    // Add Images
+    if (images_map.find(event + "Left") != images_map.end()) drawImage(images_map[event + "Left"], 0, 0);
+    if (images_map.find(event + "Right") != images_map.end()) drawImage(images_map[event + "Right"], 288, 0);
+
     std::ostringstream oss("");
     oss << time_until_event.days << " Days "
-        << time_until_event.hours << ":"
-        << time_until_event.minutes << ":"
-        << time_until_event.seconds << " until " << event << "!";
+        << time_until_event.hours << " Hrs "
+        << time_until_event.minutes << " Min "
+        << time_until_event.seconds << " Sec";
+    std::ostringstream oss2("");
+    oss2 << " until " << event << "!";
 
-    center_text(score_font, oss.str(), 0, canvas->width(), 16, rgb_matrix::Color(255, 255, 255));
+    //center_text(score_font, oss.str(), 0, canvas->width(), 16, rgb_matrix::Color(255, 255, 255));
+    center_text(score_font, oss.str(), 32, 288, 12, rgb_matrix::Color(255, 255, 255));
+    center_text(score_font, oss2.str(), 32, 288, 28, rgb_matrix::Color(255, 255, 255));
 
     // Update the Canvas
     canvas = matrix->SwapOnVSync(canvas);

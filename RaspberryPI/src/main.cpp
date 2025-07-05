@@ -59,6 +59,9 @@ void fetch_loop(std::atomic<bool>& running,
     while (running) {
         printf("Fetching Data!\n");
 
+        std::cout << "Active Display : " << active_display << std::endl;
+        //std::cout << "Cities : " << cities[0] << std::endl;
+
         if (active_display == "weather") {
 	    for (int i=0; i<int(cities.size()); i++) {
                 double lat, lon;
@@ -92,7 +95,9 @@ void fetch_loop(std::atomic<bool>& running,
 
         } else if (active_display == "sports") {
 
-            //FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard");
+            std::cout << "Fetching Sports Data!" << std::endl;
+
+            // Loop through Sports
             for (int i=0; i<int(sports.size()); i++) {
                std::ostringstream url;
                url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";

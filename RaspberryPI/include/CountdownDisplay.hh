@@ -53,6 +53,8 @@ private:
     bool first_pass;
 
     Countdown time_until_event;
+
+    std::map<std::string, std::string> images_map;
 };
 
 #endif
