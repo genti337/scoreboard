@@ -14,7 +14,9 @@ HTML = """
     button { font-size: 20px; padding: 10px 40px; margin: 20px; }
     .section-label { font-size: 20px; font-weight: bold; margin-top: 20px; }
     .checkbox-group label { font-size: 18px; display: block; margin: 4px 0; }
-    input[type="text"] { font-size: 18px; padding: 6px; width: 80%; }
+    input[type="text"], input[type="datetime-local"] {
+      font-size: 18px; padding: 6px; width: 80%;
+    }
     #temp { font-size: 18px; margin-top: 30px; color: #555; }
     .hidden { display: none; }
     .city-tag {
@@ -64,17 +66,22 @@ HTML = """
     <div id="city-list"></div>
   </div>
 
+  <div id="city-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeCityModal()">&times;</span>
+      <h3>Add a City</h3>
+      <input type="text" id="city-input" placeholder="Enter city name" />
+      <br><br>
+      <button onclick="addCity()">Add</button>
+    </div>
+  </div>
+
   <div id="countdown-wrapper" class="hidden">
     <div class="section-label">Countdown Target</div>
     <input type="text" id="countdown-event" placeholder="Event Name">
     <br><br>
-    <input type="text" id="countdown-month" placeholder="Month (1-12)">
+    <input type="datetime-local" id="countdown-datetime">
     <br><br>
-    <input type="text" id="countdown-day" placeholder="Day (1-31)">
-    <br><br>
-    <input type="text" id="countdown-hour" placeholder="Hour (0-23)">
-    <br><br>
-    <input type="text" id="countdown-minute" placeholder="Minute (0-59)">
   </div>
 
   <div id="temp">Temperature: Loading...</div>
@@ -147,11 +154,15 @@ HTML = """
         let countdownArgs = "";
         if (mode === "countdown") {
           const event = document.getElementById("countdown-event").value.trim();
-          const month = document.getElementById("countdown-month").value.trim();
-          const day = document.getElementById("countdown-day").value.trim();
-          const hour = document.getElementById("countdown-hour").value.trim();
-          const minute = document.getElementById("countdown-minute").value.trim();
-          countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}`;
+          const datetime = document.getElementById("countdown-datetime").value;
+          if (datetime) {
+            const dt = new Date(datetime);
+            const month = dt.getMonth() + 1;
+            const day = dt.getDate();
+            const hour = dt.getHours();
+            const minute = dt.getMinutes();
+            countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}`;
+          }
         }
 
         fetch("/start?" + mlb + nba + ncaaf + modeArg + cityArgs + confArgs + countdownArgs)
@@ -192,6 +203,40 @@ HTML = """
         .catch(err => {
           document.getElementById("temp").textContent = "Temperature: N/A";
         });
+    }
+
+    function openCityModal() {
+      document.getElementById("city-input").value = "";
+      document.getElementById("city-modal").classList.remove("hidden");
+    }
+
+    function closeCityModal() {
+      document.getElementById("city-modal").classList.add("hidden");
+    }
+
+    function addCity() {
+      const city = document.getElementById("city-input").value.trim();
+      if (city.length > 0 && !cityList.includes(city)) {
+        cityList.push(city);
+        updateCityListDisplay();
+      }
+      closeCityModal();
+    }
+
+    function removeCity(city) {
+      cityList = cityList.filter(c => c !== city);
+      updateCityListDisplay();
+    }
+
+    function updateCityListDisplay() {
+      const container = document.getElementById("city-list");
+      container.innerHTML = "";
+      for (const city of cityList) {
+        const div = document.createElement("div");
+        div.className = "city-tag";
+        div.innerHTML = city + ' <span class="remove-city" onclick="removeCity(\\'' + city + '\\')">&times;</span>';
+        container.appendChild(div);
+      }
     }
 
     window.onload = function () {
