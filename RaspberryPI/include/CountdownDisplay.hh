@@ -24,7 +24,6 @@ public:
     CountdownDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
     ~CountdownDisplay();
 
-
     void setText(const std::string& text);
     void setColor(uint8_t r, uint8_t g, uint8_t b);
     int getTextWidth(const rgb_matrix::Font& font, const std::string& text);
@@ -36,6 +35,7 @@ public:
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     Countdown time_until(int month, int day, int hour, int minute);
     void render(int month, int day, int hour, int minute, std::string event);
+    void set_sport(std::string ext_sport, std::string ext_league, std::string ext_team);
     void loadFont(const std::string& font_path);
 
 private:
@@ -48,6 +48,9 @@ private:
     rgb_matrix::Color textColor;
     rgb_matrix::Color bg_color;
     std::string currentText;
+    std::string sport;
+    std::string league;
+    std::string team;
 
     int max_display_x;
     bool first_pass;

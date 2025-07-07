@@ -186,6 +186,14 @@ Countdown CountdownDisplay::time_until(int month, int day, int hour, int minute)
     return countdown;
 }
 
+void CountdownDisplay::set_sport(std::string ext_sport, std::string ext_league, std::string ext_team) {
+    sport = ext_sport;
+    league = ext_league;
+    team = ext_team;
+
+    return;
+}
+
 void CountdownDisplay::render(int month, int day, int hour, int minute, std::string event) {
     // Rest Maximum Display X
     max_display_x = 0;
@@ -199,8 +207,17 @@ void CountdownDisplay::render(int month, int day, int hour, int minute, std::str
     time_until_event = time_until(month, day, hour, minute);
 
     // Add Images
-    if (images_map.find(event + "Left") != images_map.end()) drawImage(images_map[event + "Left"], 0, 0);
-    if (images_map.find(event + "Right") != images_map.end()) drawImage(images_map[event + "Right"], 288, 0);
+    if (images_map.find(event + "Left") != images_map.end()) {
+        drawImage(images_map[event + "Left"], 0, 0);
+    } else if (!sport.empty()) {
+        drawImage("../images/" + sport + ".bmp", 0, 0);
+    }
+
+    if (images_map.find(event + "Right") != images_map.end()) {
+        drawImage(images_map[event + "Right"], 288, 0);
+    } else if (!sport.empty()) {
+        drawImage("../images/" + league + "/" + team + ".bmp", 288, 0);
+    }
 
     std::ostringstream oss("");
     oss << time_until_event.days << " Days "

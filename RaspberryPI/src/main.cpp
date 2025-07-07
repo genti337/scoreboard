@@ -200,6 +200,9 @@ int main(int argc, char* argv[]) {
     std::string active_display = "";
     std::vector<std::string> sports;
     std::vector<std::string> leagues;
+    std::string countdown_sport = "";
+    std::string countdown_league = "";
+    std::string countdown_team = "";
 
     // Parse Input Arguments
     for (int i=1; i<argc; i++) {
@@ -211,6 +214,12 @@ int main(int argc, char* argv[]) {
            active_display = "weather";
        } else if (arg == "--countdown_display") {
            active_display = "countdown";
+       } else if (arg == "--countdown_sport") {
+           countdown_sport = argv[++i];
+       } else if (arg == "--countdown_league") {
+           countdown_league = argv[++i];
+       } else if (arg == "--countdown_team") {
+           countdown_team = argv[++i];
        } else if (arg == "--month") {
            month = std::stoi(argv[++i]);
        } else if (arg == "--day") {
@@ -242,6 +251,7 @@ int main(int argc, char* argv[]) {
     Display display(32, 64, 5, "adafruit-hat", active_display == "sports");
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
+    countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
     int update_index = -1;
     int weather_index = 0;
     std::vector<Competition> competitions1;

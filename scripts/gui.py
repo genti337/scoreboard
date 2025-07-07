@@ -1,5 +1,8 @@
 from flask import Flask, render_template_string, request, jsonify
 import subprocess
+import requests
+import pytz
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -87,6 +90,18 @@ HTML = """
       <option value="newyear">🎆 New Year</option>
     </select>
     <br><br>
+
+    <label for="gameday-preset">Gameday Preset:</label>
+    <select id="gameday-preset" onchange="setGamedayCountdown()">
+      <option value="">-- Select Team --</option>
+      <option value="nebraska|NEB|football|college-football">🏈 Nebraska (NCAAF)</option>
+      <option value="notre dame|ND|football|college-football">🏈 Notre Dame (NCAAF)</option>
+      <option value="cowboys|DAL|football|nfl">🏈 Dallas Cowboys (NFL)</option>
+      <option value="nebraska|NEB|baseball|college-baseball">⚾ Nebraska (NCAAB)</option>
+      <option value="astros|HOU|baseball|mlb">⚾ Astros (MLB)</option>
+    </select>
+    <br><br>
+
     <input type="text" id="countdown-event" placeholder="Event Name">
     <br><br>
     <input type="datetime-local" id="countdown-datetime">
@@ -98,6 +113,10 @@ HTML = """
   <script>
     let running = false;
     let cityList = [];
+    let countdown_sport = "";
+    let countdown_league = "";
+    let countdown_team = "";
+    let countdown_abbr = "";
 
     function updateConferenceSection() {
       const section = document.getElementById("conference-section");
@@ -170,7 +189,11 @@ HTML = """
             const day = dt.getDate();
             const hour = dt.getHours();
             const minute = dt.getMinutes();
-            countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}`;
+            const sport = countdown_sport;
+            const league = countdown_league;
+            const team = countdown_team;
+            const team_abbr = countdown_abbr;
+            countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}&sport=${sport}&league=${league}&team=${team}&team_abbr=${team_abbr}`;
           }
         }
 
@@ -286,6 +309,11 @@ HTML = """
       }
     }
 
+    function toLocalIsoString(date) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
     function calculateEasterDate(year) {
       const f = Math.floor;
       const G = year % 19;
@@ -297,6 +325,41 @@ HTML = """
       const month = 3 + f((L + 40) / 44);
       const day = L + 28 - 31 * f(month / 4);
       return new Date(year, month - 1, day, 0, 0);
+    }
+
+    async function setGamedayCountdown() {
+      const input = document.getElementById("gameday-preset").value;
+      const [team, abbr, sport, league] = input.split('|');
+      countdown_sport = sport;
+      countdown_league = league;
+      countdown_team = team;
+      countdown_abbr = abbr;
+
+      const response = await fetch('/get_game_time', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({team, sport, league})
+      });
+
+      const data = await response.json();
+
+      const preset = document.getElementById("gameday-preset").value;
+      const eventInput = document.getElementById("countdown-event");
+      const datetimeInput = document.getElementById("countdown-datetime");
+
+      const now = new Date();
+      let targetDate = null;
+      let eventName = "";
+
+      eventName = team.charAt(0).toUpperCase() + team.slice(1) + " Gameday!";
+      targetDate = new Date(data.year, data.month-1, data.day, data.hour, data.minute);
+
+      if (targetDate) {
+        const isoString = toLocalIsoString(targetDate);
+        datetimeInput.value = isoString;
+        eventInput.value = eventName;
+      }
+
     }
 
     window.onload = function () {
@@ -320,6 +383,9 @@ def index():
 def start_app():
     global process
     if not process or process.poll() is not None:
+        print("\n\n")
+        print(request.args)
+        print("\n\n")
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
         ncaaf = "NCAAF" in request.args
@@ -347,10 +413,20 @@ def start_app():
             day = request.args.get("day")
             hour = request.args.get("hour")
             minute = request.args.get("minute")
+            sport = request.args.get("sport")
+            league = request.args.get("league")
+            team = request.args.get("team")
+            team_abbr = request.args.get("team_abbr")
             if event:
                 cmd += ["--event", event]
             if month and day and hour and minute:
                 cmd += ["--month", month, "--day", day, "--hour", hour, "--minute", minute]
+            if sport:
+                cmd += ["--countdown_sport", sport]
+            if league:
+                cmd += ["--countdown_league", league]
+            if team:
+                cmd += ["--countdown_team", team_abbr]
 
         for conf_entry in conferences:
             if '|' in conf_entry:
@@ -381,6 +457,52 @@ def get_temperature():
         return jsonify({"temp_f": round(temp_f, 1)})
     except Exception as e:
         return jsonify({"temp_f": "N/A", "error": str(e)})
+
+@app.route("/get_game_time", methods=['POST'])
+def get_next_game_time(timezone='US/Central'):
+    """
+    Fetches the next scheduled game time for the given team.
+
+    Args:
+        team_name (str): Full or partial name of the team (e.g., "Nebraska").
+        sport (str): Sport name (e.g., "football", "basketball", "baseball").
+        league (str): League name (e.g., "college-football", "mlb", "nba").
+        timezone (str): Timezone to convert game time to (default 'US/Central').
+
+    Returns:
+        str: Formatted game time or message if not found.
+    """
+    data = request.get_json()
+    team_name = data.get('team')
+    sport = data.get('sport')
+    league = data.get('league')
+
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard"
+    try:
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+        for event in data.get('events', []):
+            for competitor in event['competitions'][0]['competitors']:
+                if team_name.lower() in competitor['team']['displayName'].lower():
+                    game_time = event['date']
+                    dt = datetime.fromisoformat(game_time.replace('Z', '+00:00'))
+                    local_time = dt.astimezone(pytz.timezone(timezone))
+
+                    data = {
+                        'year': local_time.year,
+                        'month': local_time.month,
+                        'day': local_time.day,
+                        'hour': local_time.hour,
+                        'minute': local_time.minute,
+                    }
+         
+                    return jsonify(data)
+
+        return f"No upcoming game found for {team_name}."
+    except Exception as e:
+        return f"Error fetching game: {e}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
