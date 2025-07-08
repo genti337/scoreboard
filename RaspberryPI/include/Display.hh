@@ -43,6 +43,7 @@ private:
     rgb_matrix::FrameCanvas* canvas;
     rgb_matrix::Font font;
     rgb_matrix::Font abbr_font;
+    rgb_matrix::Font abbr_font2;
     rgb_matrix::Font score_font;
     rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;

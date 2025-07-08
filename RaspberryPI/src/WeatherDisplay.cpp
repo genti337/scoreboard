@@ -262,9 +262,9 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
     drawWeatherIcon(weather_data[index].hourlyForecast[0].icon, weather_data[index].hourlyForecast[0].isDaytime,
                     images_dir, 0, 10);
 
-    if (weather_data[index].hourlyForecast[0].precip_perc > 20) {
+//    if (weather_data[index].hourlyForecast[0].precip_perc > 20) {
         draw_text(small_font, weather_data[index].hourlyForecast[0].precip_perc_str, 4, 32, rgb_matrix::Color(100, 150, 230));
-    }
+//    }
 
     // Hourly Forecast
     x_offset = max_display_x + 8;
@@ -275,9 +275,9 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
                         images_dir, x_offset, 8);
 
         if (update_index == 0) {
-            if (weather_data[index].hourlyForecast[i].precip_perc > 20) {
+//            if (weather_data[index].hourlyForecast[i].precip_perc > 20) {
                 draw_text(small_font, weather_data[index].hourlyForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
-            }
+//            }
         } else {
             draw_text(small_font, weather_data[index].hourlyForecast[i].temperature, x_offset + 2, 32, rgb_matrix::Color(255, 255, 255));
         }
@@ -296,9 +296,9 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
                         images_dir, x_offset, 8);
 
         if (update_index == 0) {
-            if (weather_data[index].sevenDayForecast[i].precip_perc > 20) {
+//            if (weather_data[index].sevenDayForecast[i].precip_perc > 20) {
                 draw_text(small_font, weather_data[index].sevenDayForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
-            }
+//            }
         } else if (update_index == 1) {
             draw_text(small_font, weather_data[index].sevenDayForecast[i+1].temperature, x_offset, 32, rgb_matrix::Color(0, 0, 255));
         } else if (update_index == 2) {

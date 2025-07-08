@@ -209,7 +209,8 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 // Baseball
                 if (sport == "baseball") {
                    int outs = sit["outs"].get<int>();
-                   game.outs = std::to_string(outs) + " out" + (outs == 1 ? "" : "s");
+                   //game.outs = std::to_string(outs) + " out" + (outs == 1 ? "" : "s");
+                   game.outs = std::to_string(outs);
                    game.on_first = sit.value("onFirst", false);
                    game.on_second = sit.value("onSecond", false);
                    game.on_third = sit.value("onThird", false);
