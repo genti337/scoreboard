@@ -26,6 +26,7 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     //FIXME loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
     font.LoadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");
     abbr_font.LoadFont("../rpi-rgb-led-matrix/fonts/6x13B.bdf");
+    abbr_font2.LoadFont("../fonts/6x10B.bdf");
     score_font.LoadFont("../rpi-rgb-led-matrix/fonts/7x14B.bdf");
     small_font.LoadFont("../rpi-rgb-led-matrix/fonts/4x6.bdf");
 
@@ -215,8 +216,8 @@ void Display::draw_baseball(Competition& competition, int x_init, const std::str
     max_display_x = -999;
 
     // Team Abbreviations
-    center_text(competition, font, competition.AwayTeam.abbr, x_init+34, x_init+50, 8, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-    center_text(competition, font, competition.HomeTeam.abbr, x_init+78, x_init+94, 8, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
+    center_text(competition, abbr_font, competition.AwayTeam.abbr, x_init+34, x_init+50, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
+    center_text(competition, abbr_font, competition.HomeTeam.abbr, x_init+78, x_init+94, 10, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
 
     // Team Logos
     std::ostringstream oss1("");
@@ -234,28 +235,37 @@ void Display::draw_baseball(Competition& competition, int x_init, const std::str
        center_text(competition, small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
     // Active Game Display
     } else if (competition.state == "in") {
-       center_text(competition, font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16, 255, 255, 0);
-       center_text(competition, font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16, 255, 255, 0);
+       center_text(competition, font, competition.AwayTeam.score, x_init + 34, x_init + 50, 20, 255, 255, 0);
+       center_text(competition, font, competition.HomeTeam.score, x_init + 78, x_init + 94, 20, 255, 255, 0);
        center_text(competition, small_font, competition.shortDetail, x_init + 32, x_init + 96, 30);
 
-       if (competition.shortDetail.find("Top") != std::string::npos) {
-           center_text(competition, small_font, competition.outs, x_init + 32, x_init + 64, 23);
-       } else {
-           center_text(competition, small_font, competition.outs, x_init + 64, x_init + 96, 23);
+       std::ostringstream oss3("");
+       oss3 << images_dir << "no_outs.bmp";
+       std::ostringstream oss4("");
+       oss4 << images_dir << "outs.bmp";
+       if (competition.outs == "0") {
+          drawImage(competition, oss3.str(), x_init+55, 15);
+          drawImage(competition, oss3.str(), x_init+63, 15);
+       } else if (competition.outs == "1") {
+          drawImage(competition, oss4.str(), x_init+55, 15);
+          drawImage(competition, oss3.str(), x_init+63, 15);
+       } else if (competition.outs == "2") {
+          drawImage(competition, oss4.str(), x_init+55, 15);
+          drawImage(competition, oss4.str(), x_init+63, 15);
        }
        
-       std::ostringstream oss3("");
-       oss3 << images_dir << "base_empty.bmp";
-       std::ostringstream oss4("");
-       oss4 << images_dir << "base_loaded.bmp";
+       std::ostringstream oss5("");
+       oss5 << images_dir << "base_empty.bmp";
+       std::ostringstream oss6("");
+       oss6 << images_dir << "base_loaded.bmp";
        
-       drawImage(competition, competition.on_first ? oss4.str() : oss3.str(), x_init+66, 9);
-       drawImage(competition, competition.on_second ? oss4.str() : oss3.str(), x_init+60, 3);
-       drawImage(competition, competition.on_third ? oss4.str() : oss3.str(), x_init+54, 9);
+       drawImage(competition, competition.on_first ? oss5.str() : oss6.str(), x_init+66, 8);
+       drawImage(competition, competition.on_second ? oss5.str() : oss6.str(), x_init+60, 2);
+       drawImage(competition, competition.on_third ? oss5.str() : oss6.str(), x_init+54, 8);
     // Post Game Display
     } else if (competition.state == "post") {
-       center_text(competition, font, competition.AwayTeam.score, x_init + 34, x_init + 50, 16, 255, 255, 0);
-       center_text(competition, font, competition.HomeTeam.score, x_init + 78, x_init + 94, 16, 255, 255, 0);
+       center_text(competition, font, competition.AwayTeam.score, x_init + 34, x_init + 50, 20, 255, 255, 0);
+       center_text(competition, font, competition.HomeTeam.score, x_init + 78, x_init + 94, 20, 255, 255, 0);
        center_text(competition, small_font, competition.shortDetail, x_init + 32, x_init + 96, 20);
        center_text(competition, small_font, competition.AwayTeam.record, x_init + 32, x_init + 64, 30);
        center_text(competition, small_font, competition.HomeTeam.record, x_init + 64, x_init + 96, 30);
@@ -326,7 +336,7 @@ void Display::draw_football(Competition& competition, int x_init, const std::str
 
     // Team Abbreviations and Records
     draw_text(competition, abbr_font, competition.AwayTeam.abbr, x_init + 96, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-    draw_text(competition, small_font, competition.AwayTeam.record, x_init + 108, 16, rgb_matrix::Color(255, 255, 255));
+    draw_text(competition, small_font, competition.AwayTeam.record, x_init + 96, 16, rgb_matrix::Color(255, 255, 255));
     draw_text(competition, abbr_font, competition.HomeTeam.abbr, x_init + 96, 26, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
     draw_text(competition, small_font, competition.HomeTeam.record, x_init + 96, 32, rgb_matrix::Color(255, 255, 255));
 
