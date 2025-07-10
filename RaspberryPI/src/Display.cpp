@@ -16,7 +16,7 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     options.hardware_mapping = hardware_mapping.c_str();
     options.pwm_bits = 11; //8;
     options.pwm_lsb_nanoseconds = 200; //180; //130;  // ✅ Fine for Pi 4 or Zero 2 W
-    options.brightness = 75; //50;  // ✅ Fine for Pi 4 or Zero 2 W
+    options.brightness = 90; //75; //50;  // ✅ Fine for Pi 4 or Zero 2 W
 
     RuntimeOptions runtime_opt;
     runtime_opt.gpio_slowdown = 5;
@@ -255,9 +255,9 @@ void Display::draw_baseball(Competition& competition, int x_init, const std::str
        }
        
        std::ostringstream oss5("");
-       oss5 << images_dir << "base_empty.bmp";
+       oss5 << images_dir << "base_loaded.bmp";
        std::ostringstream oss6("");
-       oss6 << images_dir << "base_loaded.bmp";
+       oss6 << images_dir << "base_empty.bmp";
        
        drawImage(competition, competition.on_first ? oss5.str() : oss6.str(), x_init+66, 8);
        drawImage(competition, competition.on_second ? oss5.str() : oss6.str(), x_init+60, 2);
