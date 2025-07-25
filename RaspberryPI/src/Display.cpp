@@ -23,7 +23,6 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     matrix = CreateMatrixFromOptions(options, runtime_opt);
     canvas = matrix->CreateFrameCanvas();
 
-    //FIXME loadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");  // Adjust to your font path
     font.LoadFont("../rpi-rgb-led-matrix/fonts/6x10.bdf");
     abbr_font.LoadFont("../rpi-rgb-led-matrix/fonts/6x13B.bdf");
     abbr_font2.LoadFont("../fonts/6x10B.bdf");
@@ -378,9 +377,7 @@ void Display::render(std::vector<Competition>& competitions, const std::string& 
     for (int i=0; i<4; i++) {
        // Initialize Competition Indices
        if (first_pass) {
-           //competition_index[i] = std::min(i, num_comp_display-1);
            competition_index[i] = (competition_index[i]) % num_comp_display;
-           printf("competition_index[%i]=%i\n", i, competition_index[i]);
        }
 
        if (competitions[competition_index[i]].sports_logo_comp) {
@@ -407,7 +404,6 @@ void Display::render(std::vector<Competition>& competitions, const std::string& 
 
           update_x_offset(competitions, i);
 
-          printf("competition_index[%i]=%i\n", i, competition_index[i]);
        } else if (first_pass) {
           if (i > 0) {
              x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
