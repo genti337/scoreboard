@@ -4,7 +4,7 @@
 
 // Constructor
 Competition::Competition() {
-   //TODO
+   game_display_width = 0;
 }
 
 // Destructor

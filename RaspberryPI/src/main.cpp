@@ -193,6 +193,7 @@ int main(int argc, char* argv[]) {
        {"--nba", {"basketball", "nba"}},
        {"--mlb", {"baseball", "mlb"}},
        {"--ncaaf", {"football", "college-football"}},
+       {"--nfl", {"football", "nfl"}},
     };
     std::vector<std::string> cities;
     std::vector<std::string> conferences;

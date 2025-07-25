@@ -55,6 +55,7 @@ HTML = """
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
       <label><input type="checkbox" id="nba" onchange="updateConferenceSection()"> NBA</label>
       <label><input type="checkbox" id="ncaaf" onchange="updateConferenceSection()"> NCAAF</label>
+      <label><input type="checkbox" id="nfl" onchange="updateConferenceSection()"> NFL</label>
     </div>
   </div>
 
@@ -126,6 +127,7 @@ HTML = """
       if (document.getElementById("mlb").checked) sports.push("mlb");
       if (document.getElementById("nba").checked) sports.push("nba");
       if (document.getElementById("ncaaf").checked) sports.push("ncaaf");
+      if (document.getElementById("nfl").checked) sports.push("nfl");
 
       const mockConfs = {
         ncaaf: ["ACC", "Big 12", "Big Ten", "CUSA", "SEC", "Pac-12", "AAC", "MAC", "Sun Belt", "MWC"]
@@ -159,6 +161,7 @@ HTML = """
         const mlb = document.getElementById("mlb").checked ? "MLB=1&" : "";
         const nba = document.getElementById("nba").checked ? "NBA=1&" : "";
         const ncaaf = document.getElementById("ncaaf").checked ? "NCAAF=1&" : "";
+        const nfl = document.getElementById("nfl").checked ? "NFL=1&" : "";
 
         const mode = document.getElementById("display-mode").value;
         const modeArg = "mode=" + mode;
@@ -197,7 +200,7 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + modeArg + cityArgs + confArgs + countdownArgs)
+        fetch("/start?" + mlb + nba + ncaaf + nfl + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -389,6 +392,7 @@ def start_app():
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
         ncaaf = "NCAAF" in request.args
+        nfl = "NFL" in request.args
         mode = request.args.get("mode", "sports")
         cities = request.args.getlist("city")
         conferences = request.args.getlist("conf")
@@ -400,6 +404,8 @@ def start_app():
             cmd.append("--nba")
         if ncaaf:
             cmd.append("--ncaaf")
+        if nfl:
+            cmd.append("--nfl")
 
         if mode == "weather":
             cmd.append("--weather_display")

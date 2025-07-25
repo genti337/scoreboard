@@ -58,6 +58,7 @@ private:
     int competition_space;
     int max_display_x;
     int leading_index;
+    int display_width;
 
     int num_comp_display;
 

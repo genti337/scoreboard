@@ -44,9 +44,12 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     game_display_width["baseball"] = 128;
     game_display_width["basketball"] = 196;
 
+    display_width = cols * chain_length;
+
     x_init[0] = cols * chain_length;
-    x_init[1] = 1000;
-    x_init[2] = 1000;
+    x_init[1] = 128;
+    x_init[2] = 128;
+    x_init[3] = 128;
 
     first_pass = true;
 }
@@ -172,8 +175,6 @@ rgb_matrix::Color Display::brighterHex(const std::string& hex1, const std::strin
     float b1 = getBrightness(color1);
     float b2 = getBrightness(color2);
 
-    //printf("%.2f %.2f\n\n", b1, b2);
-
     //return (b1 > b2) ? color1 : color2;
     return ((b1 > 25.0) || (b2 < b1)) ? color1 : color2;
 }
@@ -183,8 +184,9 @@ void Display::update_x_offset(std::vector<Competition> competitions, int index) 
     // Find the X-Offset to Use as the Starting Point
     int x_offset_index = -1;
     int x_offset = -999;
-    for (int i=0; i<num_comp_display; i++) {
+    for (int i=0; i<4; i++) {
        if (i == index) continue;
+
        if (x_init[i] > x_offset) {
           x_offset = x_init[i];
           x_offset_index = i;
@@ -373,7 +375,14 @@ void Display::render(std::vector<Competition>& competitions, const std::string& 
     canvas->Clear();
 
     // Draw the Competitions
-    for (int i=0; i<num_comp_display; i++) {
+    for (int i=0; i<4; i++) {
+       // Initialize Competition Indices
+       if (first_pass) {
+           //competition_index[i] = std::min(i, num_comp_display-1);
+           competition_index[i] = (competition_index[i]) % num_comp_display;
+           printf("competition_index[%i]=%i\n", i, competition_index[i]);
+       }
+
        if (competitions[competition_index[i]].sports_logo_comp) {
           max_display_x = -999;
           std::ostringstream oss1("");
@@ -393,10 +402,12 @@ void Display::render(std::vector<Competition>& competitions, const std::string& 
 
        // Increment Competition Index and Reset X-Offset
        if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
-          competition_index[i] = (competition_index[leading_index] + 1) % competitions.size();
+          competition_index[i] = (competition_index[leading_index] + 1) % int(competitions.size());
           leading_index = (leading_index + 1) % num_comp_display;
 
           update_x_offset(competitions, i);
+
+          printf("competition_index[%i]=%i\n", i, competition_index[i]);
        } else if (first_pass) {
           if (i > 0) {
              x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
