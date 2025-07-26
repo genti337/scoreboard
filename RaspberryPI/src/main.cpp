@@ -1,7 +1,7 @@
 #include "../include/FetchData.hh"
 #include "../include/ESPNParser.hh"
 #include "../include/WeatherParser.hh"
-#include "../include/Display.hh"
+#include "../include/SportsDisplay.hh"
 #include "../include/WeatherDisplay.hh"
 #include "../include/CountdownDisplay.hh"
 
@@ -144,7 +144,7 @@ void fetch_loop(std::atomic<bool>& running,
 }
 
 void display_loop(std::atomic<bool>& running,
-                  Display& display,
+                  SportsDisplay& display,
                   WeatherDisplay& weather_display,
                   CountdownDisplay& countdown_display,
                   int& update_index,
@@ -249,7 +249,7 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    Display display(32, 64, 5, "adafruit-hat", active_display == "sports");
+    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports");
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);

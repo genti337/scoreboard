@@ -1,11 +1,11 @@
-#include "../include/Display.hh"
+#include "../include/SportsDisplay.hh"
 #include <unistd.h>
 #include <iostream>
 
 using namespace rgb_matrix;
 using namespace Magick;
 
-Display::Display(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active) {
+SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active) {
     if (!active) return;
 
     RGBMatrix::Options options;
@@ -53,33 +53,33 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
     first_pass = true;
 }
 
-Display::~Display() {
+SportsDisplay::~SportsDisplay() {
     delete matrix;
 }
 
-void Display::set_sport(const std::string& ext_sport, const std::string& ext_league) {
+void SportsDisplay::set_sport(const std::string& ext_sport, const std::string& ext_league) {
     sport = ext_sport;
     league = ext_league;
 
     return;
 }
 
-void Display::loadFont(const std::string& font_path) {
+void SportsDisplay::loadFont(const std::string& font_path) {
     if (!font.LoadFont(font_path.c_str())) {
         std::cerr << "Couldn't load font: " << font_path << std::endl;
         exit(1);
     }
 }
 
-void Display::setText(const std::string& text) {
+void SportsDisplay::setText(const std::string& text) {
     currentText = text;
 }
 
-void Display::setColor(uint8_t r, uint8_t g, uint8_t b) {
+void SportsDisplay::setColor(uint8_t r, uint8_t g, uint8_t b) {
     textColor = rgb_matrix::Color(r, g, b);
 }
 
-int Display::getTextWidth(const rgb_matrix::Font& font, const std::string& text) {
+int SportsDisplay::getTextWidth(const rgb_matrix::Font& font, const std::string& text) {
     int width = 0;
     for (char c : text) {
         width += font.CharacterWidth(c);
@@ -87,7 +87,7 @@ int Display::getTextWidth(const rgb_matrix::Font& font, const std::string& text)
     return width;
 }
 
-void Display::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
+void SportsDisplay::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
                           int min_x, int max_x, int y,
                           int red, int green, int blue) {
     int text_width = getTextWidth(font, text);
@@ -97,7 +97,7 @@ void Display::center_text(Competition& competition, const rgb_matrix::Font& font
     max_display_x = std::max(max_display_x, max_x);
 }
 
-void Display::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
+void SportsDisplay::center_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
                           int min_x, int max_x, int y,
                           rgb_matrix::Color color) {
     int text_width = getTextWidth(font, text);
@@ -107,14 +107,14 @@ void Display::center_text(Competition& competition, const rgb_matrix::Font& font
     max_display_x = std::max(max_display_x, max_x);
 }
 
-void Display::draw_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
+void SportsDisplay::draw_text(Competition& competition, const rgb_matrix::Font& font, const std::string& text,
                         int x, int y, rgb_matrix::Color color) {
     DrawText(canvas, font, x, y, color, nullptr, text.c_str());
 
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
 }
 
-void Display::drawImage(Competition& competition, const std::string& path, int offset_x, int offset_y) {
+void SportsDisplay::drawImage(Competition& competition, const std::string& path, int offset_x, int offset_y) {
     Magick::Image image;
 
     try {
@@ -149,7 +149,7 @@ void Display::drawImage(Competition& competition, const std::string& path, int o
     max_display_x = std::max(max_display_x, offset_x + int(image.columns()));
 }
 
-rgb_matrix::Color Display::colorFromHex(const std::string& hex) {
+rgb_matrix::Color SportsDisplay::colorFromHex(const std::string& hex) {
     std::string cleaned = hex[0] == '#' ? hex.substr(1) : hex;
 
     if (cleaned.length() != 6)
@@ -163,12 +163,12 @@ rgb_matrix::Color Display::colorFromHex(const std::string& hex) {
 }
 
 // Compute perceived brightness using luminance formula
-float Display::getBrightness(const rgb_matrix::Color& color) {
+float SportsDisplay::getBrightness(const rgb_matrix::Color& color) {
     return 0.299f * color.r + 0.587f * color.g + 0.114f * color.b;
 }
 
 // Compare two hex colors and return which one is brighter
-rgb_matrix::Color Display::brighterHex(const std::string& hex1, const std::string& hex2) {
+rgb_matrix::Color SportsDisplay::brighterHex(const std::string& hex1, const std::string& hex2) {
     auto color1 = colorFromHex(hex1);
     auto color2 = colorFromHex(hex2);
     float b1 = getBrightness(color1);
@@ -179,7 +179,7 @@ rgb_matrix::Color Display::brighterHex(const std::string& hex1, const std::strin
 }
 
 // Functiont to Update the X-Offset
-void Display::update_x_offset(std::vector<Competition> competitions, int index) {
+void SportsDisplay::update_x_offset(std::vector<Competition> competitions, int index) {
     // Find the X-Offset to Use as the Starting Point
     int x_offset_index = -1;
     int x_offset = -999;
@@ -196,7 +196,7 @@ void Display::update_x_offset(std::vector<Competition> competitions, int index) 
 }
 
 // Format the Quator
-std::string Display::format_quarter_time(const std::string& shortDetail) {
+std::string SportsDisplay::format_quarter_time(const std::string& shortDetail) {
     if (shortDetail.find("Quarter") != std::string::npos) {
         size_t dash_pos = shortDetail.find(" - ");
         std::string quarter = shortDetail.substr(0, dash_pos);      // e.g., "3rd Quarter"
@@ -212,7 +212,7 @@ std::string Display::format_quarter_time(const std::string& shortDetail) {
     }
 }
 
-void Display::draw_baseball(Competition& competition, int x_init, const std::string& images_dir) {
+void SportsDisplay::draw_baseball(Competition& competition, int x_init, const std::string& images_dir) {
     // Reset the Maximum X
     max_display_x = -999;
 
@@ -278,7 +278,7 @@ void Display::draw_baseball(Competition& competition, int x_init, const std::str
     return;
 }
 
-void Display::draw_basketball(Competition& competition, int x_init, const std::string& images_dir) {
+void SportsDisplay::draw_basketball(Competition& competition, int x_init, const std::string& images_dir) {
     // Reset the Maximum X
     max_display_x = -999;
 
@@ -322,7 +322,7 @@ void Display::draw_basketball(Competition& competition, int x_init, const std::s
     return;
 }
 
-void Display::draw_football(Competition& competition, int x_init, const std::string& images_dir) {
+void SportsDisplay::draw_football(Competition& competition, int x_init, const std::string& images_dir) {
     // Reset the Maximum X
     max_display_x = -999;
 
@@ -366,7 +366,7 @@ void Display::draw_football(Competition& competition, int x_init, const std::str
     return;
 }
 
-void Display::render(std::vector<Competition>& competitions, const std::string& images_dir) {
+void SportsDisplay::render(std::vector<Competition>& competitions, const std::string& images_dir) {
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);
 

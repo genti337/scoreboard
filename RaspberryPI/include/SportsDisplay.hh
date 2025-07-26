@@ -1,5 +1,5 @@
-#ifndef DISPLAY_H
-#define DISPLAY_H
+#ifndef SPORTS_DISPLAY_H
+#define SPORTS_DISPLAY_H
 
 #include <string>
 #include <sstream>
@@ -10,10 +10,10 @@
 #include "../include/Competition.hh"
 #include <Magick++.h>
 
-class Display {
+class SportsDisplay {
 public:
-    Display(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
-    ~Display();
+    SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
+    ~SportsDisplay();
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);
     void setText(const std::string& text);
