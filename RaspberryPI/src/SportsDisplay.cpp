@@ -11,16 +11,22 @@ SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::st
     // Load Fonts specific to Sports Display
     abbr_font.LoadFont("../rpi-rgb-led-matrix/fonts/6x13B.bdf");
     score_font.LoadFont("../rpi-rgb-led-matrix/fonts/7x14B.bdf");
+    game_font.LoadFont("../rpi-rgb-led-matrix/fonts/5x7.bdf");
 
-    // Initial Competition Indexing
+    // Initial Rank and Competition Indexing
     competition_index[0] = 0;
     competition_index[1] = 1;
     competition_index[2] = 2;
     competition_index[3] = 3;
+    rank_index[0] = 0;
+    rank_index[1] = 1;
+    rank_index[2] = 2;
+    rank_index[3] = 3;
     leading_index = 3;
 
     // Initialize Game Display Widths
     competition_space = 20;
+    rank_space = 12;
     game_display_width["baseball"] = 128;
     game_display_width["basketball"] = 196;
 
@@ -57,6 +63,23 @@ void SportsDisplay::update_x_offset(std::vector<Competition> competitions, int i
     }
 
     x_init[index] = x_offset + competitions[competition_index[x_offset_index]].game_display_width + competition_space;
+}
+
+// Functiont to Update the X-Offset
+void SportsDisplay::update_x_offset(std::vector<Team> rankings, int index) {
+    // Find the X-Offset to Use as the Starting Point
+    int x_offset_index = -1;
+    int x_offset = -999;
+    for (int i=0; i<4; i++) {
+       if (i == index) continue;
+
+       if (x_init[i] > x_offset) {
+          x_offset = x_init[i];
+          x_offset_index = i;
+       }
+    }
+
+    x_init[index] = x_offset + rankings[rank_index[x_offset_index]].game_display_width + rank_space;
 }
 
 // Format the Quator
@@ -217,6 +240,12 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
     } else if (competition.state == "in") {
        draw_text(score_font, competition.AwayTeam.score, x_offset + 8, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
        draw_text(score_font, competition.HomeTeam.score, x_offset + 8, 22, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
+       x_offset = max_display_x;
+       int text_width = getTextWidth(small_font, competition.down_dist);
+       center_text(game_font, "Q" + competition.period, x_offset+8, x_offset+text_width, 8, rgb_matrix::Color(255, 255, 255));
+       center_text(game_font, competition.clock, x_offset+8, x_offset+text_width, 16, rgb_matrix::Color(255, 255, 255));
+       draw_text(game_font, competition.down_dist, x_offset+8, 24, rgb_matrix::Color(255, 255, 255));
+       center_text(game_font, competition.possession_text, x_offset + 8, x_offset+text_width, 32, rgb_matrix::Color(255, 255, 255));
     // Post Game Display
     } else if (competition.state == "post") {
        draw_text(score_font, competition.AwayTeam.score, x_offset + 8, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
@@ -230,12 +259,52 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
     return;
 }
 
+
+void SportsDisplay::draw_touchdown(const std::string& images_dir) {
+
+}
+
+void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& images_dir) {
+    // Local var
+    int x_offset = 0;
+
+    // Reset the Maximum X
+    max_display_x = -999;
+
+    // Draw the Ranking Border
+    //rgb_matrix::Color white(255, 255, 255);
+    //DrawRectangleBorder(x_init, 0, 64, 32, 2, white);
+
+    // Team Rank
+    rgb_matrix::Color white(255, 255, 255);
+    draw_text(score_font, ranking.rank, x_init, 20, white);
+
+    // Team Logos
+    std::ostringstream oss1("");
+    oss1 << images_dir << ranking.league << "/" << ranking.abbr << ".bmp";
+    drawImage(oss1.str(), max_display_x+4);
+
+    // Team Nick Name
+    x_offset = max_display_x + 4;
+    draw_text(score_font, ranking.nick_name, x_offset, 10, brighterHex(ranking.color, ranking.alt_color));
+
+    // Team Record
+    center_text(score_font, ranking.record, x_offset, max_display_x, 24, white);
+
+
+    // Calculate the Width of the Game Display
+    ranking.game_display_width = max_display_x - x_init;
+}
+
 void SportsDisplay::render(std::vector<Competition>& competitions, const std::string& images_dir) {
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);
 
     // Clear the Canvas for Update
     canvas->Clear();
+
+    // Draw Touchdown
+    draw_touchdown(images_dir);
 
     // Draw the Competitions
     for (int i=0; i<4; i++) {
@@ -271,6 +340,54 @@ void SportsDisplay::render(std::vector<Competition>& competitions, const std::st
           if (i > 0) {
              x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
           }
+       }
+
+    }
+
+    canvas = matrix->SwapOnVSync(canvas);
+
+    // Reset the First Pass Flag
+    first_pass = false;
+}
+
+
+void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::string& images_dir) {
+    // Number of Ranks to Draw
+    num_rank_display = std::min(int(rankings.size()), 4);
+
+    // Clear the Canvas for Update
+    canvas->Clear();
+
+    // Draw the Rankings
+    for (int i=0; i<4; i++) {
+       // Initialize Competition Indices
+       if (first_pass) {
+           rank_index[i] = (rank_index[i]) % num_rank_display;
+       }
+
+       if (rankings[rank_index[i]].sports_logo_rank) {
+          max_display_x = -999;
+          std::ostringstream oss1("");
+          oss1 << images_dir << rankings[rank_index[i]].league << ".bmp";
+          drawImage(oss1.str(), x_init[i], 0);
+          rankings[rank_index[i]].game_display_width = max_display_x - x_init[i];
+       } else {
+          draw_ranking(rankings[rank_index[i]], x_init[i], images_dir);
+       }
+
+       // Update X-Offset for Scrolling 
+       x_init[i] -= 1;
+
+       // Increment Ranking Index and Reset X-Offset
+       if (first_pass) {
+          if (i > 0) {
+             x_init[i] = x_init[i-1] + rankings[rank_index[i-1]].game_display_width + rank_space;
+          }
+       } else if (x_init[i] <= -rankings[rank_index[i]].game_display_width) {
+          rank_index[i] = (rank_index[leading_index] + 1) % int(rankings.size());
+          leading_index = (leading_index + 1) % num_rank_display;
+
+          update_x_offset(rankings, i);
        }
 
     }

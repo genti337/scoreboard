@@ -91,6 +91,40 @@ void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
 }
 
+//void Display::bounce_text_letters(const rgb_matrix::Font& font, const std::string& text,
+//                                  int base_x, int base_y, rgb_matrix::Color color,
+//                                  int bounce_height, int frame_delay_ms,
+//                                  int cycles)
+//{
+//    const int text_len = text.length();
+//    const int total_frames = 60;
+//    const float step = (2 * M_PI) / total_frames;
+//
+//    // Precompute character widths
+//    std::vector<int> char_widths(text_len);
+//    for (size_t i = 0; i < text_len; ++i) {
+//        char_widths[i] = getTextWidth(font, std::string(1, text[i]));
+//    }
+//
+//    for (int frame = 0; frame < total_frames * cycles; ++frame) {
+//        canvas->Clear();
+//
+//        int x = base_x;
+//        for (size_t i = 0; i < text_len; ++i) {
+//            float phase = i * 0.5f;  // phase offset between characters
+//            float t = (frame * step) + phase;
+//            int y_offset = static_cast<int>(round(sin(t) * bounce_height));
+//
+//            std::string ch(1, text[i]);
+//            draw_text(font, ch, x, base_y + y_offset, color);
+//            x += char_widths[i];  // advance by character width
+//        }
+//
+//        canvas->SwapOnVSync(canvas);
+//        std::this_thread::sleep_for(std::chrono::milliseconds(frame_delay_ms));
+//    }
+//}
+
 void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
     Magick::Image image;
 
@@ -155,3 +189,41 @@ rgb_matrix::Color Display::brighterHex(const std::string& hex1, const std::strin
     return ((b1 > 25.0) || (b2 < b1)) ? color1 : color2;
 }
 
+
+/**
+ * Draws an open rectangle (border only) with specified thickness.
+ *
+ * @param canvas Pointer to the RGBMatrix canvas.
+ * @param x Starting X coordinate (top-left).
+ * @param y Starting Y coordinate (top-left).
+ * @param width Total width of the rectangle.
+ * @param height Total height of the rectangle.
+ * @param border_thickness Thickness of the border lines.
+ * @param color RGB color of the rectangle border.
+ */
+void Display::DrawRectangleBorder(int x, int y, int width, int height, int border_thickness, rgb_matrix::Color color) {
+    for (int t = 0; t < border_thickness; ++t) {
+        int x0 = x + t;
+        int y0 = y + t;
+        int x1 = x + width - 1 - t;
+        int y1 = y + height - 1 - t;
+
+        // Top horizontal line
+        for (int col = x0; col <= x1; ++col)
+            canvas->SetPixel(col, y0, color.r, color.g, color.b);
+
+        // Bottom horizontal line
+        for (int col = x0; col <= x1; ++col)
+            canvas->SetPixel(col, y1, color.r, color.g, color.b);
+
+        // Left vertical line
+        for (int row = y0; row <= y1; ++row)
+            canvas->SetPixel(x0, row, color.r, color.g, color.b);
+
+        // Right vertical line
+        for (int row = y0; row <= y1; ++row)
+            canvas->SetPixel(x1, row, color.r, color.g, color.b);
+    }
+
+    max_display_x = x + width;
+}

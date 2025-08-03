@@ -20,10 +20,15 @@ public:
     void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, int red=255, int green=255, int blue=255);
     void center_text(const rgb_matrix::Font& font, const std::string& text, int min_x, int max_x, int y, rgb_matrix::Color color);
     void draw_text(const rgb_matrix::Font& font, const std::string& text, int x, int y, rgb_matrix::Color color);
+    //void bounce_text_letters(const rgb_matrix::Font& font, const std::string& text,
+    //                         int base_x, int base_y, rgb_matrix::Color color,
+    //                         int bounce_height = 5, int frame_delay_ms = 50,
+    //                         int cycles = 2);
     void drawImage(const std::string& path, int offset_x = 0, int offset_y = 0);
     rgb_matrix::Color colorFromHex(const std::string& hex);
     float getBrightness(const rgb_matrix::Color& color);
     rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
+    void DrawRectangleBorder(int x, int y, int width, int height, int border_thickness, rgb_matrix::Color color);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
 
 //private:

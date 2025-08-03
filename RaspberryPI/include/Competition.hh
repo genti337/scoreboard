@@ -22,6 +22,8 @@ public:
     std::string clock;		//
     std::string record;		//
     std::string rank;		//
+    std::string down_dist;      //
+    std::string possession_text;   //
 
     Team HomeTeam;
     Team AwayTeam;

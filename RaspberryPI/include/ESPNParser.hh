@@ -20,6 +20,12 @@ public:
     std::string getTeamRank(const json& team_json);
     std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
     void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league, std::vector<std::string>& ext_conferences);
+    void parseESPNRankings(const std::string& jsonstr,
+                           std::vector<Team>& teams,
+                           std::string& sport,
+                           std::string& league,
+                           std::vector<std::string>& ext_conferences);
+
 
 private:
 //    std::string sport;

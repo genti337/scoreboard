@@ -151,6 +151,7 @@ void display_loop(std::atomic<bool>& running,
                   int& weather_index,
                   std::vector<Competition>& competitions1,
                   std::vector<Competition>& competitions2,
+                  std::vector<Team>& rankings,
                   std::vector<Weather>& weather_data1,
                   std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
@@ -173,6 +174,9 @@ void display_loop(std::atomic<bool>& running,
         } else if (active_display == "countdown") {
     	    countdown_display.render(month, day, hour, minute, event_name);
             std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
+        } else if (active_display == "rankings") {
+            display.render_rankings(rankings, "../images/");
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
@@ -235,6 +239,12 @@ int main(int argc, char* argv[]) {
            cities.push_back(argv[++i]);
        } else if (arg == "--conference") {
            conferences.push_back(argv[++i]);
+       } else if (arg == "--rankings") {
+//           sports.push_back(sport_args[flag].first);
+//           leagues.push_back(sport_args[flag].second);
+           sports.push_back("football");
+           leagues.push_back("college-football");
+           active_display = "rankings";
        } else if (sport_args.find(arg) != sport_args.end()) {
            std::string flag(arg);
            sports.push_back(sport_args[flag].first);
@@ -249,7 +259,7 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports");
+    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
@@ -257,6 +267,7 @@ int main(int argc, char* argv[]) {
     int weather_index = 0;
     std::vector<Competition> competitions1;
     std::vector<Competition> competitions2;
+    std::vector<Team> rankings;
     std::vector<Weather> weather_data1;
     std::vector<Weather> weather_data2;
 
@@ -271,6 +282,14 @@ int main(int argc, char* argv[]) {
        display.set_sport(std::ref(sports[0]), std::ref(leagues[0]));
     }
 
+    // Fetch Rankings
+    FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings");
+    std::string data = fetcher.fetch();
+    for (int i=0; i<int(sports.size()); i++) {
+        parser.parseESPNRankings(data, std::ref(rankings), sports[i], leagues[i], std::ref(conferences));
+    }
+
+    // Display Loop Thread
     std::thread displayThread(display_loop,
                               std::ref(running),
                               std::ref(display),
@@ -280,11 +299,13 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_index),
                               std::ref(competitions1),
                               std::ref(competitions2),
+                              std::ref(rankings),
                               std::ref(weather_data1),
                               std::ref(weather_data2),
                               std::ref(cities),
                               active_display);
 
+    // Data Loop Thread
     std::thread fetchThread(fetch_loop,
                             std::ref(running),
                             std::ref(parser),

@@ -147,7 +147,7 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
 
     if (!j.contains("events")) return;
 
-    try {
+//    try {
 
 	// Add competitions for Sport Logo
 	Competition game;
@@ -169,6 +169,8 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
 
             game.state = comp["status"]["type"]["state"].get<std::string>();
             game.shortDetail = comp["status"]["type"]["shortDetail"].get<std::string>();
+            game.period = std::to_string(comp["status"]["period"].get<int>());
+            game.clock = comp["status"]["displayClock"].get<std::string>();
 
             std::tie(game.day, game.date, game.time) = convertToLocalTime(comp["date"].get<std::string>());
 
@@ -214,6 +216,9 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                    game.on_first = sit.value("onFirst", false);
                    game.on_second = sit.value("onSecond", false);
                    game.on_third = sit.value("onThird", false);
+                } else if (sport == "football") {
+                   game.down_dist = sit["shortDownDistanceText"].get<std::string>();
+                   game.possession_text = sit["possessionText"].get<std::string>();
                 }
             }
 
@@ -229,9 +234,46 @@ void ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 competitions.push_back(game);
             }
         }
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
-    }
+//    } catch (const std::exception& e) {
+//        std::cerr << "Failed to parse JSON: " << e.what() << std::endl;
+//    }
 
     return;
+}
+
+// espn scoreboard parser
+void ESPNParser::parseESPNRankings(const std::string& jsonstr,
+                                   std::vector<Team>& teams,
+                                   std::string& sport,
+                                   std::string& league,
+                                   std::vector<std::string>& ext_conferences) {
+    json j = json::parse(jsonstr);
+
+    if (!j.contains("rankings")) return;
+
+    // Ranking Sport Logo
+    Team t;
+    t.sports_logo_rank = true;
+    t.sport = sport;
+    t.league = league;
+    teams.push_back(t);
+
+    // Parse Rankings
+    for (const auto& poll : j["rankings"]) {
+    	for (const auto& rank : poll["ranks"]) {
+            Team t;
+            t.sports_logo_rank = false;
+            t.rank = std::to_string(rank["current"].get<int>());
+            t.abbr = rank["team"]["abbreviation"];
+            t.color = rank["team"].contains("color") ? rank["team"]["color"] : "FFFFFF";
+            t.alt_color = rank["team"].contains("alternateColor") ? rank["team"]["alternateColor"] : "000000";
+            t.nick_name = rank["team"]["nickname"];
+            t.record = rank["recordSummary"];
+            t.sport = sport;
+            t.league = league;
+
+            teams.push_back(t);
+        }
+        break;
+    }
 }

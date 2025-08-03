@@ -18,12 +18,16 @@ public:
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);
     void update_x_offset(std::vector<Competition> competitions, int index);
+    void update_x_offset(std::vector<Team> rankings, int index);
     std::string format_quarter_time(const std::string& shortDetail);
     void draw_baseball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
+    void draw_touchdown(const std::string& images_dir);
+    void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     void render(std::vector<Competition>& competitions, const std::string& images_dir);
+    void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
 
 private:
     struct Pixel {
@@ -32,6 +36,7 @@ private:
 
     rgb_matrix::Font abbr_font;
     rgb_matrix::Font score_font;
+    rgb_matrix::Font game_font;
     rgb_matrix::Color textColor;
     rgb_matrix::Color bg_color;
     std::string currentText;
@@ -42,9 +47,12 @@ private:
     int x_init[4];
     int competition_index[4];
     int competition_space;
+    int rank_space;
     int leading_index;
+    int rank_index[4];
 
     int num_comp_display;
+    int num_rank_display;
 };
 
 #endif
