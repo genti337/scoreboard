@@ -239,9 +239,7 @@ int main(int argc, char* argv[]) {
            cities.push_back(argv[++i]);
        } else if (arg == "--conference") {
            conferences.push_back(argv[++i]);
-       } else if (arg == "--rankings") {
-//           sports.push_back(sport_args[flag].first);
-//           leagues.push_back(sport_args[flag].second);
+       } else if (arg == "--college-football-rankings") {
            sports.push_back("football");
            leagues.push_back("college-football");
            active_display = "rankings";

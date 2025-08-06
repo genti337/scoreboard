@@ -45,6 +45,7 @@ HTML = """
   <div class="section-label">Mode</div>
   <select id="display-mode" onchange="handleModeChange()" style="font-size: 18px; margin-top: 10px;">
     <option value="sports">Sports</option>
+    <option value="rankings">Rankings</option>
     <option value="weather">Weather Display</option>
     <option value="countdown">Countdown</option>
   </select>
@@ -62,6 +63,13 @@ HTML = """
   <div id="conference-wrapper">
     <div class="section-label">Conferences</div>
     <div id="conference-section" class="checkbox-group"></div>
+  </div>
+
+  <div id="rankings-wrapper">
+    <div class="section-label">Sports</div>
+    <div class="checkbox-group">
+      <label><input type="checkbox" id="ncaaf-rankings"> NCAAF</label>
+    </div>
   </div>
 
   <div id="weather-wrapper" class="hidden">
@@ -166,6 +174,13 @@ HTML = """
         const mode = document.getElementById("display-mode").value;
         const modeArg = "mode=" + mode;
 
+        let ncaafRankings = "";
+        if (mode === "rankings") {
+          if (document.getElementById("ncaaf-rankings").checked) {
+            ncaafRankings = "NCAAFRankings=1&";
+          }
+        }
+
         let cityArgs = "";
         if (mode === "weather") {
           for (const city of cityList) {
@@ -200,7 +215,7 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + nfl + modeArg + cityArgs + confArgs + countdownArgs)
+        fetch("/start?" + mlb + nba + ncaaf + nfl + ncaafRankings + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -220,13 +235,15 @@ HTML = """
       const mode = document.getElementById("display-mode").value;
       const isWeather = (mode === "weather");
       const isCountdown = (mode === "countdown");
+      const isRankings = (mode === "rankings");
 
-      document.getElementById("sports-wrapper").classList.toggle("hidden", isWeather || isCountdown);
+      document.getElementById("sports-wrapper").classList.toggle("hidden", isWeather || isCountdown || isRankings);
       document.getElementById("weather-wrapper").classList.toggle("hidden", !isWeather);
-      document.getElementById("conference-wrapper").classList.toggle("hidden", isWeather || isCountdown);
+      document.getElementById("conference-wrapper").classList.toggle("hidden", isWeather || isCountdown || isRankings);
       document.getElementById("countdown-wrapper").classList.toggle("hidden", !isCountdown);
+      document.getElementById("rankings-wrapper").classList.toggle("hidden", !isRankings);
 
-      if (!isWeather && !isCountdown) updateConferenceSection();
+      if (!isWeather && !isCountdown && !isRankings) updateConferenceSection();
     }
 
     function updateTemp() {
@@ -392,20 +409,22 @@ def start_app():
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
         ncaaf = "NCAAF" in request.args
+        ncaaf_rankings = "NCAAFRankings" in request.args
         nfl = "NFL" in request.args
         mode = request.args.get("mode", "sports")
         cities = request.args.getlist("city")
         conferences = request.args.getlist("conf")
 
         cmd = ["sudo", "../RaspberryPI/./espn_jsonc"]
-        if mlb:
-            cmd.append("--mlb")
-        if nba:
-            cmd.append("--nba")
-        if ncaaf:
-            cmd.append("--ncaaf")
-        if nfl:
-            cmd.append("--nfl")
+        if mode == "sports":
+            if mlb:
+                cmd.append("--mlb")
+            if nba:
+                cmd.append("--nba")
+            if ncaaf:
+                cmd.append("--ncaaf")
+            if nfl:
+                cmd.append("--nfl")
 
         if mode == "weather":
             cmd.append("--weather_display")
@@ -433,6 +452,10 @@ def start_app():
                 cmd += ["--countdown_league", league]
             if team:
                 cmd += ["--countdown_team", team_abbr]
+
+        elif mode == "rankings":
+            if ncaaf_rankings:
+                cmd.append("--college-football-rankings")
 
         for conf_entry in conferences:
             if '|' in conf_entry:
