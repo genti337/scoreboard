@@ -84,6 +84,24 @@ void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
     max_display_x = std::max(max_display_x, max_x);
 }
 
+void Display::center_text_vertically(const rgb_matrix::Font& font, const std::string& text,
+                                     int min_x, int max_x, int min_y, int max_y,
+                                     rgb_matrix::Color color) {
+    int text_width = getTextWidth(font, text);
+    int text_height = font.height();
+
+    // Center horizontally
+    int x = min_x + (max_x - min_x - text_width) / 2;
+
+    // Center vertically
+    int y = min_y + (max_y - min_y - text_height) / 2 + text_height; 
+    // Adding text_height because DrawText y is typically baseline, not top
+
+    DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+
+    max_display_x = std::max(max_display_x, max_x);
+}
+
 void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
                         int x, int y, rgb_matrix::Color color) {
     DrawText(canvas, font, x, y, color, nullptr, text.c_str());
@@ -148,6 +166,50 @@ void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
 
             // Optional: skip out-of-bounds pixels
             if (draw_x >= 0 && draw_x < canvas->width() &&
+                draw_y >= 0 && draw_y < canvas->height()) {
+                canvas->SetPixel(draw_x, draw_y,
+                                 static_cast<uint8_t>(color.red() * 255),
+                                 static_cast<uint8_t>(color.green() * 255),
+                                 static_cast<uint8_t>(color.blue() * 255));
+            }
+        }
+    }
+
+    max_display_x = std::max(max_display_x, offset_x + int(image.columns()));
+}
+
+void Display::drawImageCentered(const std::string& path, int offset_x, int min_y, int max_y) {
+    Magick::Image image;
+
+    try {
+        image.read(path);
+    } catch (const Magick::Exception &error) {
+        std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
+        return;
+    }
+
+    image.type(Magick::TrueColorType);
+    image.modifyImage(); // Allow pixel access
+
+    // Calculate vertical center between min_y and max_y
+    int range_height = max_y - min_y + 1;
+    int img_height = static_cast<int>(image.rows());
+    int offset_y = min_y + (range_height - img_height) / 2;
+
+    // Clamp offset_y if image taller than range
+    if (img_height > range_height) {
+        offset_y = min_y; // Top-align if too tall
+    }
+
+    for (size_t y = 0; y < image.rows(); ++y) {
+        for (size_t x = 0; x < image.columns(); ++x) {
+            const Magick::ColorRGB color = image.pixelColor(x, y);
+
+            int draw_x = static_cast<int>(x) + offset_x;
+            int draw_y = static_cast<int>(y) + offset_y;
+
+            if (draw_x >= 0 && draw_x < canvas->width() &&
+                draw_y >= min_y && draw_y <= max_y &&
                 draw_y >= 0 && draw_y < canvas->height()) {
                 canvas->SetPixel(draw_x, draw_y,
                                  static_cast<uint8_t>(color.red() * 255),
