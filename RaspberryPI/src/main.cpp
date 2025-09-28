@@ -21,6 +21,48 @@ int hour = 0;
 int minute = 0;
 std::string event_name = "";
 
+// C++17-safe alias for days
+using days = std::chrono::duration<long long, std::ratio<86400>>;
+
+// Helper: last Saturday in August for a given year
+static std::tm getSeasonStart(int year) {
+    std::tm tm {};
+    tm.tm_year = year - 1900;
+    tm.tm_mon  = 7;     // August (0=Jan)
+    tm.tm_mday = 23;    // Aug 31
+    tm.tm_hour = 12;    // noon to avoid DST weirdness
+    std::mktime(&tm);
+
+    // Walk back to Saturday (0=Sun, 6=Sat)
+    while (tm.tm_wday != 6) {
+        tm.tm_mday -= 1;
+        std::mktime(&tm);
+    }
+    return tm; // Treat this as Week 1 start
+}
+
+// Returns current CFB week (1-based).
+// Before the season starts: returns 0 (preseason).
+// If count_prev_bowls=true, dates in early Jan count toward last season.
+int getCollegeFootballWeek(bool count_prev_bowls = false) {
+    int week = 0;
+    std::ostringstream url;
+
+    url << "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
+
+    FetchData fetcher(url.str());
+    std::string data = fetcher.fetch();
+
+    nlohmann::json j;
+    j = nlohmann::json::parse(data);
+
+    week = j["week"]["number"];
+
+    printf("\n\nCurrent Week : %i\n\n", week);
+
+    return week;
+}
+
 bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
     CURL* curl = curl_easy_init();
     char* escaped = curl_easy_escape(curl, city.c_str(), 0);
@@ -55,6 +97,7 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& leagues,
                 std::vector<std::string>& cities,
                 std::string active_display) {
+    std::string err;
 
     while (running) {
         printf("Fetching Data!\n");
@@ -100,23 +143,29 @@ void fetch_loop(std::atomic<bool>& running,
             // Loop through Sports
             for (int i=0; i<int(sports.size()); i++) {
                std::ostringstream url;
-               url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
+
+               if (leagues[i] == "college-football") {
+                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() << "&seasontype=2&groups=80&limit=1000";
+               } else {
+                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
+               }
                FetchData fetcher(url.str());
                std::string data = fetcher.fetch();
 
                printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
+	       std::cout << "URL: " << url.str() << std::endl;
    
                if (!data.empty()) {
                    if (update_index <= 0) {
                        if (i == 0) {
                           competitions1.clear();
                        }
-                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i], std::ref(conferences));
+                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i], std::ref(conferences), &err);
                    } else {
                        if (i == 0) {
                           competitions2.clear();
                        }
-                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i], std::ref(conferences));
+                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i], std::ref(conferences), &err);
                    }
    
                    std::cout << "Length of competitions: " << competitions1.size() << std::endl;

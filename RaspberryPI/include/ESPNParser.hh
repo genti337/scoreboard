@@ -19,7 +19,12 @@ public:
     std::string getTeamRecord(const json& team_json);
     std::string getTeamRank(const json& team_json);
     std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
-    void parseESPNScoreboard(const std::string& jsonStr, std::vector<Competition>& competitions, std::string& sport, std::string& league, std::vector<std::string>& ext_conferences);
+    bool parseESPNScoreboard(const std::string& jsonStr,
+                             std::vector<Competition>& competitions,
+                             const std::string& sport,
+                             const std::string& league,
+                             const std::vector<std::string>& ext_conferences,
+                             std::string* error_path);
     void parseESPNRankings(const std::string& jsonstr,
                            std::vector<Team>& teams,
                            std::string& sport,

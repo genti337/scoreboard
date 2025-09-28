@@ -24,6 +24,7 @@ public:
     std::string rank;		//
     std::string down_dist;      //
     std::string possession_text;   //
+    std::string possession_id;		// Posession Team ID
 
     Team HomeTeam;
     Team AwayTeam;

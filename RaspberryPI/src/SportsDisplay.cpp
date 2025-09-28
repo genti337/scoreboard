@@ -246,11 +246,13 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
        draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
 
        std::ostringstream oss3("");
-       oss3 << images_dir << "football2.bmp";
+       oss3 << images_dir << "possession_football.bmp";
        x_offset = max_display_x + 4;
-       drawImage(oss3.str(), x_offset, -3);
-       drawImage(oss3.str(), x_offset, 10);
-
+       if (competition.AwayTeam.team_id == competition.possession_id) {
+          drawImage(oss3.str(), x_offset, 10);
+       } else {
+          drawImage(oss3.str(), x_offset, -3);
+       }
 
        x_offset = max_display_x + 16;
        int text_width = getTextWidth(small_font, competition.possession_text);
@@ -270,8 +272,6 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
        } else if (std::stoi(competition.AwayTeam.score) < std::stoi(competition.HomeTeam.score)) {
           drawImage(oss3.str(), max_display_x+2, 12);
        }
-
-
 
        draw_text(font, "Final", x_offset, 32, rgb_matrix::Color(255, 255, 255));
     }
@@ -305,7 +305,7 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
     // Team Logos
     std::ostringstream oss1("");
     oss1 << images_dir << ranking.league << "/" << ranking.abbr << ".bmp";
-    drawImage(oss1.str(), max_display_x+4);
+    drawImageCentered(oss1.str(), max_display_x+4, 0, 32);
 
     // Team Nick Name
     x_offset = max_display_x + 4;
@@ -392,7 +392,7 @@ void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::stri
           max_display_x = -999;
           std::ostringstream oss1("");
           oss1 << images_dir << rankings[rank_index[i]].league << ".bmp";
-          drawImage(oss1.str(), x_init[i], 0);
+          drawImageCentered(oss1.str(), x_init[i], 0, 32);
           rankings[rank_index[i]].game_display_width = max_display_x - x_init[i];
        } else {
           draw_ranking(rankings[rank_index[i]], x_init[i], images_dir);

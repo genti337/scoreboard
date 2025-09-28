@@ -20,6 +20,7 @@ public:
     std::string conference_id;	// Team Conference ID
     std::string sport;	// Team Conference ID
     std::string league;	// Team Conference ID
+    std::string team_id;
 
     int game_display_width;	
 
