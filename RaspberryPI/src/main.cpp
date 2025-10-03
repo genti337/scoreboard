@@ -145,7 +145,7 @@ void fetch_loop(std::atomic<bool>& running,
                std::ostringstream url;
 
                if (leagues[i] == "college-football") {
-                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() << "&seasontype=2&groups=80&limit=1000";
+                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() << "&seasontype=2&groups=80&limit=500";
                } else {
                   url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
                }
