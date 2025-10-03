@@ -74,16 +74,13 @@ std::string ESPNParser::getTeamRecord(const json& team_json) {
     return "";
 }
 
-std::string ESPNParser::getTeamRank(const json& team_json) {
+int ESPNParser::getTeamRank(const json& team_json) {
     try {
-        if (team_json.contains("team") && team_json["team"].contains("rank")) {
-            int rank = team_json["team"]["rank"];
-            return "#" + std::to_string(rank);
-        }
+        int rank = team_json["curatedRank"]["current"];
+        return rank;
     } catch (...) {
-        return "";
+        return 99;
     }
-    return "";
 }
 
 std::tuple<std::string, std::string, std::string> ESPNParser::convertToLocalTime(const std::string& utc_time_str) {
@@ -339,7 +336,7 @@ void ESPNParser::parseESPNRankings(const std::string& jsonstr,
     	for (const auto& rank : poll["ranks"]) {
             Team t;
             t.sports_logo_rank = false;
-            t.rank = std::to_string(rank["current"].get<int>());
+            t.rank = rank["current"].get<int>();
             t.abbr = rank["team"]["abbreviation"];
             t.color = rank["team"].contains("color") ? rank["team"]["color"] : "FFFFFF";
             t.alt_color = rank["team"].contains("alternateColor") ? rank["team"]["alternateColor"] : "000000";

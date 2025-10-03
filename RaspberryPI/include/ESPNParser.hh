@@ -17,7 +17,7 @@ public:
     ~ESPNParser();
 
     std::string getTeamRecord(const json& team_json);
-    std::string getTeamRank(const json& team_json);
+    int getTeamRank(const json& team_json);
     std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
     bool parseESPNScoreboard(const std::string& jsonStr,
                              std::vector<Competition>& competitions,

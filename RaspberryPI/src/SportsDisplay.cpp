@@ -216,11 +216,21 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
     // Reset the Maximum X
     max_display_x = -999;
 
-    // Team Logos
+    // Team Logos and Ranks
+    if (competition.AwayTeam.rank < 99) {
+        draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
     std::ostringstream oss1("");
     oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImageCentered(oss1.str(), x_init, 0, 32);
+    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
     center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
+
+    if (competition.HomeTeam.rank < 99) {
+        x_offset = max_display_x - getTextWidth(font, std::to_string(competition.HomeTeam.rank));
+        draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
     std::ostringstream oss2("");
     oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
     drawImageCentered(oss2.str(), max_display_x, 0, 32);
@@ -300,7 +310,7 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
 
     // Team Rank
     rgb_matrix::Color white(255, 255, 255);
-    draw_text(score_font, ranking.rank, x_init, 20, white);
+    draw_text(score_font, "#" + std::to_string(ranking.rank), x_init, 20, white);
 
     // Team Logos
     std::ostringstream oss1("");
