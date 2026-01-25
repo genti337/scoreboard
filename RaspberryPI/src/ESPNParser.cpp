@@ -75,10 +75,12 @@ std::string ESPNParser::getTeamRecord(const json& team_json) {
 }
 
 int ESPNParser::getTeamRank(const json& team_json) {
-    try {
-        int rank = team_json["curatedRank"]["current"];
-        return rank;
-    } catch (...) {
+    if (team_json.contains("curatedRank") &&
+        team_json["curatedRank"].contains("current") &&
+        team_json["curatedRank"]["current"].is_number_integer()) {
+        
+        return team_json["curatedRank"]["current"].get<int>();
+    } else {
         return 99;
     }
 }

@@ -166,41 +166,76 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
 }
 
 void SportsDisplay::draw_basketball(Competition& competition, int x_init, const std::string& images_dir) {
+    // Local varibales for x_offset
+    int x_offset = 0;
+
     // Reset the Maximum X
     max_display_x = -999;
 
-    // Team Logos
+    // Team Logos and Ranks
+    if (competition.AwayTeam.rank < 99) {
+        draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
     std::ostringstream oss1("");
     oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImage(oss1.str(), x_init);
-    center_text(font, "vs", x_init + 32, x_init + 56, 16);
+    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
+    center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
+
+    if (competition.HomeTeam.rank < 99) {
+        x_offset = max_display_x - getTextWidth(font, std::to_string(competition.HomeTeam.rank));
+        draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
     std::ostringstream oss2("");
     oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
-    drawImage(oss2.str(), x_init+56);
+    drawImageCentered(oss2.str(), max_display_x, 0, 32);
 
     // Team Abbreviations and Records
-    draw_text(font, competition.AwayTeam.abbr, x_init + 96, 8, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-    draw_text(small_font, competition.AwayTeam.record, x_init + 96, 15, rgb_matrix::Color(255, 255, 255));
-    draw_text(font, competition.HomeTeam.abbr, x_init + 96, 24, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
-    draw_text(small_font, competition.HomeTeam.record, x_init + 96, 31, rgb_matrix::Color(255, 255, 255));
+    x_offset = max_display_x + 8;
+    draw_text(abbr_font, competition.AwayTeam.abbr, x_offset, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
+    draw_text(small_font, competition.AwayTeam.record, x_offset+1, 16, rgb_matrix::Color(255, 255, 255));
+    draw_text(abbr_font, competition.HomeTeam.abbr, x_offset, 26, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
+    draw_text(small_font, competition.HomeTeam.record, x_offset+1, 32, rgb_matrix::Color(255, 255, 255));
 
-    int max_record_width_x = std::max(getTextWidth(small_font, competition.AwayTeam.record),
-                                      getTextWidth(small_font, competition.HomeTeam.record));
+    // Current X-Offset
+    x_offset = max_display_x + 8;
 
     // Pre Game Display
     if (competition.state == "pre") {
-       draw_text(font, competition.date, x_init + 96 + max_record_width_x + 8, 12, rgb_matrix::Color(255, 255, 255));
-       draw_text(font, competition.time, x_init + 96 + max_record_width_x + 8, 24, rgb_matrix::Color(255, 255, 255));
+       draw_text(font, competition.day, x_offset, 8, rgb_matrix::Color(255, 255, 255));
+       draw_text(font, competition.date, x_offset, 20, rgb_matrix::Color(255, 255, 255));
+       draw_text(font, competition.time, x_offset, 32, rgb_matrix::Color(255, 255, 255));
     // Active Game Display
     } else if (competition.state == "in") {
-       draw_text(score_font, competition.AwayTeam.score, x_init + 96 + max_record_width_x + 8, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-       draw_text(score_font, competition.HomeTeam.score, x_init + 96 + max_record_width_x + 8, 22, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
-       draw_text(font, format_quarter_time(competition.shortDetail), x_init + 96 + max_record_width_x + 8, 32, rgb_matrix::Color(255, 255, 255));
+       draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
+       draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
+
+       std::ostringstream oss3("");
+       oss3 << images_dir << "possession_football.bmp";
+       x_offset = max_display_x + 4;
+       if (competition.AwayTeam.team_id == competition.possession_id) {
+          drawImage(oss3.str(), x_offset, 10);
+       } else {
+          drawImage(oss3.str(), x_offset, -3);
+       }
+
+       x_offset = max_display_x + 16;
+       draw_text(font, format_quarter_time(competition.shortDetail), x_offset, 32, rgb_matrix::Color(255, 255, 255));
     // Post Game Display
     } else if (competition.state == "post") {
-       draw_text(score_font, competition.AwayTeam.score, x_init + 96 + max_record_width_x + 8, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-       draw_text(score_font, competition.HomeTeam.score, x_init + 96 + max_record_width_x + 8, 22, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
-       draw_text(font, "Final", x_init + 96 + max_record_width_x + 8, 32, rgb_matrix::Color(255, 255, 255));
+       draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
+       draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
+
+       std::ostringstream oss3("");
+       oss3 << images_dir << "arrow.bmp";
+       if (std::stoi(competition.AwayTeam.score) > std::stoi(competition.HomeTeam.score)) {
+          drawImage(oss3.str(), max_display_x+2, 0);
+       } else if (std::stoi(competition.AwayTeam.score) < std::stoi(competition.HomeTeam.score)) {
+          drawImage(oss3.str(), max_display_x+2, 12);
+       }
+
+       draw_text(font, "Final", x_offset, 32, rgb_matrix::Color(255, 255, 255));
     }
 
     // Calculate the Width of the Game Display

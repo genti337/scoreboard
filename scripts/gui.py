@@ -56,6 +56,7 @@ HTML = """
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
       <label><input type="checkbox" id="nba" onchange="updateConferenceSection()"> NBA</label>
       <label><input type="checkbox" id="ncaaf" onchange="updateConferenceSection()"> NCAAF</label>
+      <label><input type="checkbox" id="ncaab" onchange="updateConferenceSection()"> NCAAB</label>
       <label><input type="checkbox" id="nfl" onchange="updateConferenceSection()"> NFL</label>
     </div>
   </div>
@@ -135,6 +136,7 @@ HTML = """
       if (document.getElementById("mlb").checked) sports.push("mlb");
       if (document.getElementById("nba").checked) sports.push("nba");
       if (document.getElementById("ncaaf").checked) sports.push("ncaaf");
+      if (document.getElementById("ncaab").checked) sports.push("ncaab");
       if (document.getElementById("nfl").checked) sports.push("nfl");
 
       const mockConfs = {
@@ -169,6 +171,7 @@ HTML = """
         const mlb = document.getElementById("mlb").checked ? "MLB=1&" : "";
         const nba = document.getElementById("nba").checked ? "NBA=1&" : "";
         const ncaaf = document.getElementById("ncaaf").checked ? "NCAAF=1&" : "";
+        const ncaab = document.getElementById("ncaab").checked ? "NCAAB=1&" : "";
         const nfl = document.getElementById("nfl").checked ? "NFL=1&" : "";
 
         const mode = document.getElementById("display-mode").value;
@@ -215,7 +218,7 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + nfl + ncaafRankings + modeArg + cityArgs + confArgs + countdownArgs)
+        fetch("/start?" + mlb + nba + ncaaf + ncaab + nfl + ncaafRankings + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -403,12 +406,10 @@ def index():
 def start_app():
     global process
     if not process or process.poll() is not None:
-        print("\n\n")
-        print(request.args)
-        print("\n\n")
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
         ncaaf = "NCAAF" in request.args
+        ncaab = "NCAAB" in request.args
         ncaaf_rankings = "NCAAFRankings" in request.args
         nfl = "NFL" in request.args
         mode = request.args.get("mode", "sports")
@@ -423,6 +424,8 @@ def start_app():
                 cmd.append("--nba")
             if ncaaf:
                 cmd.append("--ncaaf")
+            if ncaab:
+                cmd.append("--ncaab")
             if nfl:
                 cmd.append("--nfl")
 
@@ -463,6 +466,10 @@ def start_app():
                 cmd += ["--conference", conf, "--sport", sport]
             else:
                 cmd += ["--conference", conf_entry]
+
+        print("Mode : " + mode)
+        print(cmd)
+        print(request.args)
 
         process = subprocess.Popen(cmd)
         return "App started."

@@ -11,9 +11,9 @@ General ESPN logo fetcher -> 32px-tall, stride-safe BMPs saved as ABBREV.bmp.
 - Saves as TEAM_ABBREV.bmp (e.g., BAL.bmp, NYY.bmp, NEB.bmp).
 
 Examples:
-  NFL:  python logos_any_league_to_bmp.py --sport football --league nfl
-  MLB:  python logos_any_league_to_bmp.py --sport baseball --league mlb
-  NCAAF:python logos_any_league_to_bmp.py --sport football --league college-football
+  NFL:  python get_team_logos.py --sport football --league nfl
+  MLB:  python get_team_logos.py --sport baseball --league mlb
+  NCAAF:python get_team_logos.py --sport football --league college-football
   Subset: --teams BAL,KC,NEB,NYY
 """
 

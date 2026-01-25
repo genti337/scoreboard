@@ -41,24 +41,69 @@ static std::tm getSeasonStart(int year) {
     return tm; // Treat this as Week 1 start
 }
 
-// Returns current CFB week (1-based).
-// Before the season starts: returns 0 (preseason).
-// If count_prev_bowls=true, dates in early Jan count toward last season.
-int getCollegeFootballWeek(bool count_prev_bowls = false) {
-    int week = 0;
+// Returns number of weeks in College Football Season
+int getCollegeFootballRegularSeasonWeeks() {
     std::ostringstream url;
-
     url << "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
 
     FetchData fetcher(url.str());
     std::string data = fetcher.fetch();
 
-    nlohmann::json j;
-    j = nlohmann::json::parse(data);
+    nlohmann::json j = nlohmann::json::parse(data);
 
-    week = j["week"]["number"];
+    int week = 0;
 
-    printf("\n\nCurrent Week : %i\n\n", week);
+    if (!j.contains("week") || !j["week"].contains("number")) {
+        return 0;  // preseason or malformed response
+    }
+
+    // -------------------------------------------------
+    // Determine regular season length dynamically
+    // -------------------------------------------------
+    int regularSeasonWeeks = j["leagues"][0]["calendar"][0]["entries"].size();
+
+    return regularSeasonWeeks;
+}
+
+// Returns current CFB week (1-based).
+// Before the season starts: returns 0 (preseason).
+// During postseason, returns week offset beyond regular season.
+int getCollegeFootballWeek(bool count_prev_bowls = false) {
+    std::ostringstream url;
+    url << "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
+
+    FetchData fetcher(url.str());
+    std::string data = fetcher.fetch();
+
+    nlohmann::json j = nlohmann::json::parse(data);
+
+    int week = 0;
+
+    if (!j.contains("week") || !j["week"].contains("number")) {
+        return 0;  // preseason or malformed response
+    }
+
+    // -------------------------------------------------
+    // Determine regular season length dynamically
+    // -------------------------------------------------
+    int regularSeasonWeeks = j["leagues"][0]["calendar"][0]["entries"].size();
+
+    week = j["week"]["number"].get<int>();
+
+    // ESPN season type:
+    // 1 = preseason, 2 = regular, 3 = postseason
+    int seasonType = j["season"]["type"].get<int>();
+
+    if (seasonType == 3) {  // Postseason
+        week += regularSeasonWeeks;
+    }
+
+    // Optional: early January bowl handling
+    if (count_prev_bowls && seasonType == 1) {
+        week = regularSeasonWeeks;
+    }
+
+    printf("\nCurrent CFB Week (normalized): %i\n", week);
 
     return week;
 }
@@ -138,17 +183,21 @@ void fetch_loop(std::atomic<bool>& running,
 
         } else if (active_display == "sports") {
 
-            std::cout << "Fetching Sports Data!" << std::endl;
+            std::cout << "Fetching Sports Data: ";
 
             // Loop through Sports
             for (int i=0; i<int(sports.size()); i++) {
                std::ostringstream url;
 
-               if (leagues[i] == "college-football") {
-                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() << "&seasontype=2&groups=80&limit=500";
+               if (leagues[i] == "college-football" 
+               && (getCollegeFootballWeek() <= getCollegeFootballRegularSeasonWeeks())) {
+                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] 
+                      << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() 
+                      << "&seasontype=2&groups=80&limit=500";
                } else {
                   url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
                }
+	       std::cout << url.str() << std::endl;
                FetchData fetcher(url.str());
                std::string data = fetcher.fetch();
 
@@ -244,6 +293,7 @@ void display_loop(std::atomic<bool>& running,
 int main(int argc, char* argv[]) {
     std::unordered_map<std::string, std::pair<std::string, std::string>> sport_args = {
        {"--nba", {"basketball", "nba"}},
+       {"--ncaab", {"basketball", "mens-college-basketball"}},
        {"--mlb", {"baseball", "mlb"}},
        {"--ncaaf", {"football", "college-football"}},
        {"--nfl", {"football", "nfl"}},
