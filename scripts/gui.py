@@ -70,6 +70,7 @@ HTML = """
     <div class="section-label">Sports</div>
     <div class="checkbox-group">
       <label><input type="checkbox" id="ncaaf-rankings"> NCAAF</label>
+      <label><input type="checkbox" id="ncaab-rankings"> NCAAB</label>
     </div>
   </div>
 
@@ -178,9 +179,12 @@ HTML = """
         const modeArg = "mode=" + mode;
 
         let ncaafRankings = "";
+        let ncaabRankings = "";
         if (mode === "rankings") {
           if (document.getElementById("ncaaf-rankings").checked) {
             ncaafRankings = "NCAAFRankings=1&";
+          } else if (document.getElementById("ncaab-rankings").checked) {
+            ncaabRankings = "NCAABRankings=1&";
           }
         }
 
@@ -218,7 +222,7 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + ncaab + nfl + ncaafRankings + modeArg + cityArgs + confArgs + countdownArgs)
+        fetch("/start?" + mlb + nba + ncaaf + ncaab + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -411,6 +415,7 @@ def start_app():
         ncaaf = "NCAAF" in request.args
         ncaab = "NCAAB" in request.args
         ncaaf_rankings = "NCAAFRankings" in request.args
+        ncaab_rankings = "NCAABRankings" in request.args
         nfl = "NFL" in request.args
         mode = request.args.get("mode", "sports")
         cities = request.args.getlist("city")
@@ -459,6 +464,8 @@ def start_app():
         elif mode == "rankings":
             if ncaaf_rankings:
                 cmd.append("--college-football-rankings")
+            if ncaab_rankings:
+                cmd.append("--mens-college-basketball-rankings")
 
         for conf_entry in conferences:
             if '|' in conf_entry:

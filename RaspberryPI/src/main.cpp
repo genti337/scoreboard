@@ -342,6 +342,10 @@ int main(int argc, char* argv[]) {
            sports.push_back("football");
            leagues.push_back("college-football");
            active_display = "rankings";
+       } else if (arg == "--mens-college-basketball-rankings") {
+           sports.push_back("basketball");
+           leagues.push_back("mens-college-basketball");
+           active_display = "rankings";
        } else if (sport_args.find(arg) != sport_args.end()) {
            std::string flag(arg);
            sports.push_back(sport_args[flag].first);
@@ -380,7 +384,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Fetch Rankings
-    FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings");
+    std::ostringstream url;
+    url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[0] << "/" << leagues[0] << "/rankings";
+    FetchData fetcher(url.str());
     std::string data = fetcher.fetch();
     for (int i=0; i<int(sports.size()); i++) {
         parser.parseESPNRankings(data, std::ref(rankings), sports[i], leagues[i], std::ref(conferences));

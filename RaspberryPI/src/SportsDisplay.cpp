@@ -211,16 +211,6 @@ void SportsDisplay::draw_basketball(Competition& competition, int x_init, const 
        draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
        draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
 
-       std::ostringstream oss3("");
-       oss3 << images_dir << "possession_football.bmp";
-       x_offset = max_display_x + 4;
-       if (competition.AwayTeam.team_id == competition.possession_id) {
-          drawImage(oss3.str(), x_offset, 10);
-       } else {
-          drawImage(oss3.str(), x_offset, -3);
-       }
-
-       x_offset = max_display_x + 16;
        draw_text(font, format_quarter_time(competition.shortDetail), x_offset, 32, rgb_matrix::Color(255, 255, 255));
     // Post Game Display
     } else if (competition.state == "post") {
@@ -401,6 +391,7 @@ void SportsDisplay::render(std::vector<Competition>& competitions, const std::st
        // Increment Competition Index and Reset X-Offset
        if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
           competition_index[i] = (competition_index[leading_index] + 1) % int(competitions.size());
+
           leading_index = (leading_index + 1) % num_comp_display;
 
           update_x_offset(competitions, i);
