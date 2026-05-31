@@ -19,7 +19,7 @@ else
     LDFLAGS += -L../rpi-rgb-led-matrix/lib
 endif
 
-LIBS = -ljson-c -lcurl -lrgbmatrix -lrt -lm -lpthread $(shell pkg-config --libs Magick++)
+LIBS = -ljson-c -lcurl -ltinyxml2 -lrgbmatrix -lrt -lm -lpthread $(shell pkg-config --libs Magick++)
 
 all: $(TARGET)
 

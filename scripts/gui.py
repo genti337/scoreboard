@@ -57,6 +57,7 @@ HTML = """
       <label><input type="checkbox" id="nba" onchange="updateConferenceSection()"> NBA</label>
       <label><input type="checkbox" id="ncaaf" onchange="updateConferenceSection()"> NCAAF</label>
       <label><input type="checkbox" id="ncaab" onchange="updateConferenceSection()"> NCAAB</label>
+      <label><input type="checkbox" id="ncaabs" onchange="updateConferenceSection()"> NCAABS</label>
       <label><input type="checkbox" id="nfl" onchange="updateConferenceSection()"> NFL</label>
     </div>
   </div>
@@ -138,6 +139,7 @@ HTML = """
       if (document.getElementById("nba").checked) sports.push("nba");
       if (document.getElementById("ncaaf").checked) sports.push("ncaaf");
       if (document.getElementById("ncaab").checked) sports.push("ncaab");
+      if (document.getElementById("ncaabs").checked) sports.push("ncaabs");
       if (document.getElementById("nfl").checked) sports.push("nfl");
 
       const mockConfs = {
@@ -173,6 +175,7 @@ HTML = """
         const nba = document.getElementById("nba").checked ? "NBA=1&" : "";
         const ncaaf = document.getElementById("ncaaf").checked ? "NCAAF=1&" : "";
         const ncaab = document.getElementById("ncaab").checked ? "NCAAB=1&" : "";
+        const ncaabs = document.getElementById("ncaabs").checked ? "NCAABS=1&" : "";
         const nfl = document.getElementById("nfl").checked ? "NFL=1&" : "";
 
         const mode = document.getElementById("display-mode").value;
@@ -222,7 +225,7 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + ncaab + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs)
+        fetch("/start?" + mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs)
           .then(res => res.text())
           .then(data => {
             running = true;
@@ -414,6 +417,7 @@ def start_app():
         nba = "NBA" in request.args
         ncaaf = "NCAAF" in request.args
         ncaab = "NCAAB" in request.args
+        ncaabs = "NCAABS" in request.args
         ncaaf_rankings = "NCAAFRankings" in request.args
         ncaab_rankings = "NCAABRankings" in request.args
         nfl = "NFL" in request.args
@@ -431,6 +435,8 @@ def start_app():
                 cmd.append("--ncaaf")
             if ncaab:
                 cmd.append("--ncaab")
+            if ncaabs:
+                cmd.append("--ncaabs")
             if nfl:
                 cmd.append("--nfl")
 

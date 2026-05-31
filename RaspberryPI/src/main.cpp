@@ -24,23 +24,6 @@ std::string event_name = "";
 // C++17-safe alias for days
 using days = std::chrono::duration<long long, std::ratio<86400>>;
 
-// Helper: last Saturday in August for a given year
-static std::tm getSeasonStart(int year) {
-    std::tm tm {};
-    tm.tm_year = year - 1900;
-    tm.tm_mon  = 7;     // August (0=Jan)
-    tm.tm_mday = 23;    // Aug 31
-    tm.tm_hour = 12;    // noon to avoid DST weirdness
-    std::mktime(&tm);
-
-    // Walk back to Saturday (0=Sun, 6=Sat)
-    while (tm.tm_wday != 6) {
-        tm.tm_mday -= 1;
-        std::mktime(&tm);
-    }
-    return tm; // Treat this as Week 1 start
-}
-
 // Returns number of weeks in College Football Season
 int getCollegeFootballRegularSeasonWeeks() {
     std::ostringstream url;
@@ -108,10 +91,40 @@ int getCollegeFootballWeek(bool count_prev_bowls = false) {
     return week;
 }
 
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+bool getCoordinatesFromLocation(double& lat, double& lon) {
+    CURL* curl = curl_easy_init();
+    std::string response;
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, "http://ip-api.com/json/");
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+        curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+    }
+
+    auto j = json::parse(response);
+
+    lat = j["lat"];
+    lon = j["lon"];
+
+    std::cout << "Latitude: " << lat << "\n";
+    std::cout << "Longitude: " << lon << "\n";
+
+    return true;
+}
+
 bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
     CURL* curl = curl_easy_init();
     char* escaped = curl_easy_escape(curl, city.c_str(), 0);
     std::string url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + std::string(escaped);
+
+    std::cout << "Fetching coordinate URL: " << url << std::endl;
 
     curl_free(escaped);
     curl_easy_cleanup(curl);
@@ -153,13 +166,15 @@ void fetch_loop(std::atomic<bool>& running,
         if (active_display == "weather") {
 	    for (int i=0; i<int(cities.size()); i++) {
                 double lat, lon;
-                getCoordinatesFromCity(cities[i], lat, lon);
+                //getCoordinatesFromCity(cities[i], lat, lon);
+                getCoordinatesFromLocation(lat, lon);
 
                 std::ostringstream ss_lat, ss_lon;
                 ss_lat << std::fixed << std::setprecision(4) << lat;
                 ss_lon << std::fixed << std::setprecision(4) << lon;
                 std::ostringstream url;
                 url << "https://api.weather.gov/points/" << ss_lat.str() << "," << ss_lon.str();
+		std::cout << "Fetching Weather URL: " << url.str() << std::endl;
                 FetchData fetcher(url.str());
                 std::string data = fetcher.fetch();
 
@@ -253,6 +268,7 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Weather>& weather_data1,
                   std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
+                  std::vector<RssItem>& newsItems,
                   std::string active_display) {
     printf("Updating Display!\n");
 
@@ -275,6 +291,8 @@ void display_loop(std::atomic<bool>& running,
         } else if (active_display == "rankings") {
             display.render_rankings(rankings, "../images/");
             std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+        } else if (active_display == "sports_news") {
+
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
@@ -294,6 +312,7 @@ int main(int argc, char* argv[]) {
     std::unordered_map<std::string, std::pair<std::string, std::string>> sport_args = {
        {"--nba", {"basketball", "nba"}},
        {"--ncaab", {"basketball", "mens-college-basketball"}},
+       {"--ncaabs", {"baseball", "college-baseball"}},
        {"--mlb", {"baseball", "mlb"}},
        {"--ncaaf", {"football", "college-football"}},
        {"--nfl", {"football", "nfl"}},
@@ -371,6 +390,7 @@ int main(int argc, char* argv[]) {
     std::vector<Team> rankings;
     std::vector<Weather> weather_data1;
     std::vector<Weather> weather_data2;
+    std::vector<RssItem> newsItems;
 
     // Resize the Weather Data Vector
     weather_data1.resize(int(cities.size()));
@@ -384,13 +404,22 @@ int main(int argc, char* argv[]) {
     }
 
     // Fetch Rankings
-    std::ostringstream url;
-    url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[0] << "/" << leagues[0] << "/rankings";
-    FetchData fetcher(url.str());
-    std::string data = fetcher.fetch();
-    for (int i=0; i<int(sports.size()); i++) {
-        parser.parseESPNRankings(data, std::ref(rankings), sports[i], leagues[i], std::ref(conferences));
+    if (active_display == "rankings") {
+        std::ostringstream url;
+        url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[0] << "/" << leagues[0] << "/rankings";
+        FetchData fetcher(url.str());
+        std::string data = fetcher.fetch();
+        for (int i=0; i<int(sports.size()); i++) {
+            parser.parseESPNRankings(data, std::ref(rankings), sports[i], leagues[i], std::ref(conferences));
+        }
     }
+
+//    // Fetch ESPN RSS Feed
+//    std::ostringstream url;
+//    url << "https://www.espn.com/espn/rss/ncf/news";
+//    FetchData fetcher(url.str());
+//    std::string data = fetcher.fetch();
+//    parser.parseRSSFeed(data);
 
     // Display Loop Thread
     std::thread displayThread(display_loop,
@@ -406,6 +435,7 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_data1),
                               std::ref(weather_data2),
                               std::ref(cities),
+                              std::ref(newsItems),
                               active_display);
 
     // Data Loop Thread
