@@ -40,8 +40,8 @@ public:
         uint8_t r, g, b;
     };
 
-    rgb_matrix::RGBMatrix* matrix;
-    rgb_matrix::FrameCanvas* canvas;
+    rgb_matrix::RGBMatrix* matrix = nullptr;
+    rgb_matrix::FrameCanvas* canvas = nullptr;
     rgb_matrix::Font font;
     rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;

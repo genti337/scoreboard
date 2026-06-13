@@ -104,7 +104,12 @@ void Display::center_text_vertically(const rgb_matrix::Font& font, const std::st
 
 void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
                         int x, int y, rgb_matrix::Color color) {
+
+    #ifdef MAC_STUB_MATRIX
     DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    #else
+    rgb_matrix::DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    #endif
 
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
 }

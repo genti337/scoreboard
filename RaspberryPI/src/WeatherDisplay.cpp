@@ -55,7 +55,6 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
 }
 
 WeatherDisplay::~WeatherDisplay() {
-    delete matrix;
 }
 
 void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,

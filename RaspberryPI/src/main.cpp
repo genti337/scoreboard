@@ -15,6 +15,49 @@
 #include <ctime>
 #include <chrono>
 
+
+#ifdef MAC_STUB_MATRIX
+
+#include <unistd.h>
+
+#include <sys/select.h>
+
+#include "led-matrix.h"
+
+static bool enterPressedNonBlocking() {
+
+    fd_set set;
+
+    struct timeval timeout;
+
+    FD_ZERO(&set);
+
+    FD_SET(STDIN_FILENO, &set);
+
+    timeout.tv_sec = 0;
+
+    timeout.tv_usec = 0;
+
+    int rv = select(STDIN_FILENO + 1, &set, nullptr, nullptr, &timeout);
+
+    if (rv > 0 && FD_ISSET(STDIN_FILENO, &set)) {
+
+        char c;
+
+        if (read(STDIN_FILENO, &c, 1) > 0) {
+
+            return c == '\n';
+
+        }
+
+    }
+
+    return false;
+
+}
+
+#endif
+
 int month = 1;
 int day = 1;
 int hour = 0;
@@ -268,7 +311,6 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Weather>& weather_data1,
                   std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
-                  std::vector<RssItem>& newsItems,
                   std::string active_display) {
     printf("Updating Display!\n");
 
@@ -379,7 +421,8 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    //FIXME SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    SportsDisplay display(32, 64, 2, "adafruit-hat", active_display == "sports" || active_display == "rankings");
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
@@ -390,7 +433,6 @@ int main(int argc, char* argv[]) {
     std::vector<Team> rankings;
     std::vector<Weather> weather_data1;
     std::vector<Weather> weather_data2;
-    std::vector<RssItem> newsItems;
 
     // Resize the Weather Data Vector
     weather_data1.resize(int(cities.size()));
@@ -435,7 +477,6 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_data1),
                               std::ref(weather_data2),
                               std::ref(cities),
-                              std::ref(newsItems),
                               active_display);
 
     // Data Loop Thread
@@ -454,13 +495,38 @@ int main(int argc, char* argv[]) {
                             std::ref(cities),
                             active_display);
 
-    std::cout << "Press Enter to stop..." << std::endl;
-    std::cin.get();  // Wait for user input
+    std::cout << "Close emulator window or press Esc to stop..." << std::endl;
 
+    #ifdef MAC_STUB_MATRIX
+    
+    while (running) {
+        rgb_matrix::EmulatorMainThreadTick();
+    
+        if (rgb_matrix::EmulatorQuitRequested()) {
+            running = false;
+            break;
+        }
+    
+        SDL_Delay(16);
+    }
+
+    if (displayThread.joinable()) {
+        displayThread.join();
+    }
+
+    if (fetchThread.joinable()) {
+        fetchThread.detach();
+    }
+    
+    // Shutdown SDL last
+    rgb_matrix::EmulatorShutdown();
+
+    #else
+    std::cin.get();
     running = false;
-
     displayThread.join();
     fetchThread.join();
+    #endif
 
     std::cout << "All threads stopped." << std::endl;
 
