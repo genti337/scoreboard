@@ -19,8 +19,8 @@ public:
     void drawWeatherIcon(const std::string& icon, bool is_daytime,
                          const std::string& images_dir, int offset_x, int offset_y);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    int render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir);
-    void render_text(std::string text);
+    int draw(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir);
+    void draw_weather_text(std::string text);
 
 private:
     rgb_matrix::Font temp_font;

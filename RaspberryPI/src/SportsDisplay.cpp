@@ -5,6 +5,8 @@
 using namespace rgb_matrix;
 using namespace Magick;
 
+auto last_index_update = std::chrono::steady_clock::now();
+
 SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active) : 
     Display(rows, cols, chain_length, hardware_mapping, active) {
 
@@ -105,7 +107,6 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
     // Away Team Logo
     std::ostringstream oss1("");
     oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    std::cout << oss1.str() << std::endl;
     drawImage(oss1.str(), x_init);
 
     // Away Team Abbreviation
@@ -162,17 +163,17 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
 
     // Post Game Display
     } else if (competition.state == "post") {
-//FIXME //       center_text(font, competition.AwayTeam.score, x_init + 34, x_init + 50, 20, 255, 255, 0);
-//FIXME //       center_text(font, competition.HomeTeam.score, x_init + 78, x_init + 94, 20, 255, 255, 0);
-//FIXME //       center_text(small_font, competition.shortDetail, x_init + 32, x_init + 96, 20);
+       int min_x = max_display_x;
+       int max_x = min_x + getTextWidth(small_font, competition.shortDetail);
+       center_text(font, competition.AwayTeam.score, start_x, start_x + getTextWidth(font, competition.AwayTeam.abbr), 20, 255, 255, 0);
+       center_text(small_font, competition.shortDetail, min_x, max_x, 20);
     }
-
 
     // Home Team Abbreviation
     start_x = max_display_x;
     draw_text(abbr_font, competition.HomeTeam.abbr, start_x, 9, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
     if (competition.state != "in") draw_text(small_font, competition.HomeTeam.record, start_x, 30, rgb_matrix::Color(255, 255, 255));
-    if (competition.state == "in") center_text(font, competition.HomeTeam.score, max_display_x-getTextWidth(font, competition.HomeTeam.abbr), max_display_x, 20, 255, 255, 0);
+    if (competition.state != "pre") center_text(font, competition.HomeTeam.score, max_display_x-getTextWidth(font, competition.HomeTeam.abbr), max_display_x, 20, 255, 255, 0);
 
     // Home Team Logo
     std::ostringstream oss2("");
@@ -374,56 +375,65 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
     ranking.game_display_width = max_display_x - x_init;
 }
 
-void SportsDisplay::render(std::vector<Competition>& competitions, const std::string& images_dir) {
+void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display) {
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);
-
-    // Clear the Canvas for Update
-    canvas->Clear();
 
     // Draw Touchdown
     draw_touchdown(images_dir);
 
-    // Draw the Competitions
-    for (int i=0; i<4; i++) {
-       // Initialize Competition Indices
-       if (first_pass) {
-           competition_index[i] = (competition_index[i]) % num_comp_display;
-       }
+    if (scroll_display) {
 
-       if (competitions[competition_index[i]].sports_logo_comp) {
-          max_display_x = -999;
-          std::ostringstream oss1("");
-          oss1 << images_dir << competitions[competition_index[i]].league << ".bmp";
-          drawImage(oss1.str(), x_init[i], 0);
-          competitions[competition_index[i]].game_display_width = max_display_x - x_init[i];
-       } else if (competitions[competition_index[i]].sport == "baseball") {
-          draw_baseball(competitions[competition_index[i]], x_init[i], images_dir);
-       } else if (competitions[competition_index[i]].sport == "basketball") {
-          draw_basketball(competitions[competition_index[i]], x_init[i], images_dir);
-       } else if (competitions[competition_index[i]].sport == "football") {
-          draw_football(competitions[competition_index[i]], x_init[i], images_dir);
-       }
+        // Draw the Competitions
+        for (int i=0; i<4; i++) {
+           // Initialize Competition Indices
+           if (first_pass) {
+               competition_index[i] = (competition_index[i]) % num_comp_display;
+           }
+    
+           if (competitions[competition_index[i]].sports_logo_comp) {
+              max_display_x = -999;
+              std::ostringstream oss1("");
+              oss1 << images_dir << competitions[competition_index[i]].league << ".bmp";
+              drawImage(oss1.str(), x_init[i], 0);
+              competitions[competition_index[i]].game_display_width = max_display_x - x_init[i];
+           } else if (competitions[competition_index[i]].sport == "baseball") {
+              draw_baseball(competitions[competition_index[i]], x_init[i], images_dir);
+           } else if (competitions[competition_index[i]].sport == "basketball") {
+              draw_basketball(competitions[competition_index[i]], x_init[i], images_dir);
+           } else if (competitions[competition_index[i]].sport == "football") {
+              draw_football(competitions[competition_index[i]], x_init[i], images_dir);
+           }
+    
+           // Update X-Offset for Scrolling 
+           x_init[i] -= 1;
+    
+           // Increment Competition Index and Reset X-Offset
+           if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
+              competition_index[i] = (competition_index[leading_index] + 1) % int(competitions.size());
+    
+              leading_index = (leading_index + 1) % num_comp_display;
+    
+              update_x_offset(competitions, i);
+           } else if (first_pass) {
+              if (i > 0) {
+                 x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
+              }
+           }
+    
+        }
+    } else {
 
-       // Update X-Offset for Scrolling 
-       x_init[i] -= 1;
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_index_update >= std::chrono::seconds(10)) {
+           last_index_update = std::chrono::steady_clock::now();
+           competition_index[1] += 1;
+        }
 
-       // Increment Competition Index and Reset X-Offset
-       if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
-          competition_index[i] = (competition_index[leading_index] + 1) % int(competitions.size());
-
-          leading_index = (leading_index + 1) % num_comp_display;
-
-          update_x_offset(competitions, i);
-       } else if (first_pass) {
-          if (i > 0) {
-             x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
-          }
-       }
-
+        draw_baseball(competitions[competition_index[1]], 0, images_dir);
     }
 
-    canvas = matrix->SwapOnVSync(canvas);
+//    canvas = matrix->SwapOnVSync(canvas);
 
     // Reset the First Pass Flag
     first_pass = false;
@@ -470,8 +480,6 @@ void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::stri
        }
 
     }
-
-    canvas = matrix->SwapOnVSync(canvas);
 
     // Reset the First Pass Flag
     first_pass = false;

@@ -24,6 +24,9 @@
 
 #include "led-matrix.h"
 
+using namespace rgb_matrix;
+using namespace Magick;
+
 static bool enterPressedNonBlocking() {
 
     fd_set set;
@@ -314,37 +317,66 @@ void display_loop(std::atomic<bool>& running,
                   std::string active_display) {
     printf("Updating Display!\n");
 
+    RGBMatrix::Options options;
+    options.rows = 32;
+    options.cols = 64;
+    options.chain_length = 5;
+    options.parallel = 1;
+//    options.hardware_mapping = hardware_mapping.c_str();
+    options.pwm_bits = 11; //8;
+    options.pwm_lsb_nanoseconds = 200; //180; //130;  // ✅ Fine for Pi 4 or Zero 2 W
+    options.brightness = 90; //75; //50;  // ✅ Fine for Pi 4 or Zero 2 W
+    
+    RuntimeOptions runtime_opt;
+    runtime_opt.gpio_slowdown = 5;
+
+    RGBMatrix* matrix = CreateMatrixFromOptions(options, runtime_opt);
+    FrameCanvas* canvas = matrix->CreateFrameCanvas();
+
+    // Attach Matrix and Canvas
+    display.attach(matrix, canvas);
+    weather_display.attach(matrix, canvas);
+
     while (running) {
+	canvas->Clear();
+	display.setCanvas(canvas);
+	weather_display.setCanvas(canvas);
+
         if (active_display == "weather") {
             if (update_index == 0) {
-               weather_index = weather_display.render(cities[weather_index], weather_data2, weather_index, "../images/");
+               weather_index = weather_display.draw(cities[weather_index], weather_data2, weather_index, "../images/");
             } else if (update_index == 1) {
-               weather_index = weather_display.render(cities[weather_index], weather_data1, weather_index, "../images/");
+               weather_index = weather_display.draw(cities[weather_index], weather_data1, weather_index, "../images/");
             } else {
-               weather_display.render_text("Fetching Weather Data!");
+               weather_display.draw_weather_text("Fetching Weather Data!");
             }
 
             std::cout << "Updated weather index : " << weather_index << std::endl;
 
-            std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
         } else if (active_display == "countdown") {
     	    countdown_display.render(month, day, hour, minute, event_name);
-            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
+//            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
         } else if (active_display == "rankings") {
             display.render_rankings(rankings, "../images/");
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
         } else if (active_display == "sports_news") {
-
+            //TODO
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
-    	        display.render(competitions2, "../images/");
+    	        display.draw(competitions2, "../images/", true);
             } else if (update_index == 1 && competitions1.size() > 0) {
-    	        display.render(competitions1, "../images/");
+    	        display.draw(competitions1, "../images/", true);
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
         }
+
+    	canvas = matrix->SwapOnVSync(canvas);
+
+    	std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+    	//std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
     }
 
     return;

@@ -38,7 +38,7 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
 }
 
 Display::~Display() {
-    delete matrix;
+//    delete matrix;
 }
 
 void Display::loadFont(const std::string& font_path) {
@@ -297,3 +297,21 @@ void Display::DrawRectangleBorder(int x, int y, int width, int height, int borde
 
     max_display_x = x + width;
 }
+
+void Display::attach(rgb_matrix::RGBMatrix* shared_matrix,
+                     rgb_matrix::FrameCanvas* shared_canvas)
+{
+    matrix = shared_matrix;
+
+    canvas = shared_canvas;
+
+    return;
+}
+
+void Display::setCanvas(rgb_matrix::FrameCanvas* shared_canvas)
+{
+    canvas = shared_canvas;
+
+    return;
+}
+

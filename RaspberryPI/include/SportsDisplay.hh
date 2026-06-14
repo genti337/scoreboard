@@ -26,7 +26,7 @@ public:
     void draw_touchdown(const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void render(std::vector<Competition>& competitions, const std::string& images_dir);
+    void draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display);
     void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
 
 private:
