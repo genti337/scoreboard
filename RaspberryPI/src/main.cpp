@@ -315,6 +315,7 @@ void display_loop(std::atomic<bool>& running,
                   std::string active_display) {
     printf("Updating Display!\n");
 
+#ifdef MAC_STUB_MATRIX
     RGBMatrix::Options options;
     options.rows = 32;
     options.cols = 64;
@@ -334,11 +335,14 @@ void display_loop(std::atomic<bool>& running,
     // Attach Matrix and Canvas
     display.attach(matrix, canvas);
     weather_display.attach(matrix, canvas);
+#endif
 
     while (running) {
+#ifdef MAC_STUB_MATRIX
 	canvas->Clear();
 	display.setCanvas(canvas);
 	weather_display.setCanvas(canvas);
+#endif
 
         if (active_display == "weather") {
             if (update_index == 0) {
@@ -371,7 +375,9 @@ void display_loop(std::atomic<bool>& running,
 //            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
         }
 
+#ifdef MAC_STUB_MATRIX
     	canvas = matrix->SwapOnVSync(canvas);
+#endif
 
     	std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
     	//std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
@@ -451,8 +457,7 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    //FIXME SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
-    SportsDisplay display(32, 64, 2, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
@@ -525,10 +530,9 @@ int main(int argc, char* argv[]) {
                             std::ref(cities),
                             active_display);
 
+#ifdef MAC_STUB_MATRIX
     std::cout << "Close emulator window or press Esc to stop..." << std::endl;
 
-    #ifdef MAC_STUB_MATRIX
-    
     while (running) {
         rgb_matrix::EmulatorMainThreadTick();
     
@@ -551,12 +555,12 @@ int main(int argc, char* argv[]) {
     // Shutdown SDL last
     rgb_matrix::EmulatorShutdown();
 
-    #else
+#else
     std::cin.get();
     running = false;
     displayThread.join();
     fetchThread.join();
-    #endif
+#endif
 
     std::cout << "All threads stopped." << std::endl;
 
