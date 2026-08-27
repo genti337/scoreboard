@@ -376,6 +376,11 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
 }
 
 void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display) {
+#ifndef MAC_STUB_MATRIX
+    // Clear the Canvas for Update
+    canvas->Clear();
+#endif
+
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);
 
@@ -446,8 +451,10 @@ void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::stri
     // Number of Ranks to Draw
     num_rank_display = std::min(int(rankings.size()), 4);
 
+#ifndef MAC_STUB_MATRIX
     // Clear the Canvas for Update
     canvas->Clear();
+#endif
 
     // Draw the Rankings
     for (int i=0; i<4; i++) {

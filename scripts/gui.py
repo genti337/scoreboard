@@ -2,7 +2,7 @@ from flask import Flask, render_template_string, request, jsonify
 import subprocess
 import requests
 import pytz
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -93,6 +93,7 @@ HTML = """
 
   <div id="countdown-wrapper" class="hidden">
     <div class="section-label">Countdown Target</div>
+
     <label for="holiday-preset">Holiday Preset:</label>
     <select id="holiday-preset" onchange="setHolidayCountdown()">
       <option value="">-- Select a Holiday --</option>
@@ -101,6 +102,7 @@ HTML = """
       <option value="halloween">🎃 Halloween</option>
       <option value="newyear">🎆 New Year</option>
     </select>
+
     <br><br>
 
     <label for="gameday-preset">Gameday Preset:</label>
@@ -112,6 +114,7 @@ HTML = """
       <option value="nebraska|NEB|baseball|college-baseball">⚾ Nebraska (NCAAB)</option>
       <option value="astros|HOU|baseball|mlb">⚾ Astros (MLB)</option>
     </select>
+
     <br><br>
 
     <input type="text" id="countdown-event" placeholder="Event Name">
@@ -125,6 +128,7 @@ HTML = """
   <script>
     let running = false;
     let cityList = [];
+
     let countdown_sport = "";
     let countdown_league = "";
     let countdown_team = "";
@@ -135,6 +139,7 @@ HTML = """
       section.innerHTML = "";
 
       const sports = [];
+
       if (document.getElementById("mlb").checked) sports.push("mlb");
       if (document.getElementById("nba").checked) sports.push("nba");
       if (document.getElementById("ncaaf").checked) sports.push("ncaaf");
@@ -170,6 +175,7 @@ HTML = """
 
     function toggleApp() {
       const button = document.getElementById("toggle-btn");
+
       if (!running) {
         const mlb = document.getElementById("mlb").checked ? "MLB=1&" : "";
         const nba = document.getElementById("nba").checked ? "NBA=1&" : "";
@@ -183,6 +189,7 @@ HTML = """
 
         let ncaafRankings = "";
         let ncaabRankings = "";
+
         if (mode === "rankings") {
           if (document.getElementById("ncaaf-rankings").checked) {
             ncaafRankings = "NCAAFRankings=1&";
@@ -192,6 +199,7 @@ HTML = """
         }
 
         let cityArgs = "";
+
         if (mode === "weather") {
           for (const city of cityList) {
             cityArgs += "&city=" + encodeURIComponent(city);
@@ -199,6 +207,7 @@ HTML = """
         }
 
         let confArgs = "";
+
         document.querySelectorAll("#conference-section input[type='checkbox']").forEach(box => {
           if (box.checked) {
             const conf = box.getAttribute("data-conf");
@@ -208,19 +217,23 @@ HTML = """
         });
 
         let countdownArgs = "";
+
         if (mode === "countdown") {
           const event = document.getElementById("countdown-event").value.trim();
           const datetime = document.getElementById("countdown-datetime").value;
+
           if (datetime) {
             const dt = new Date(datetime);
             const month = dt.getMonth() + 1;
             const day = dt.getDate();
             const hour = dt.getHours();
             const minute = dt.getMinutes();
+
             const sport = countdown_sport;
             const league = countdown_league;
             const team = countdown_team;
             const team_abbr = countdown_abbr;
+
             countdownArgs += `&event=${encodeURIComponent(event)}&month=${month}&day=${day}&hour=${hour}&minute=${minute}&sport=${sport}&league=${league}&team=${team}&team_abbr=${team_abbr}`;
           }
         }
@@ -231,6 +244,7 @@ HTML = """
             running = true;
             button.textContent = "Stop Display";
           });
+
       } else {
         fetch("/stop")
           .then(res => res.text())
@@ -253,7 +267,9 @@ HTML = """
       document.getElementById("countdown-wrapper").classList.toggle("hidden", !isCountdown);
       document.getElementById("rankings-wrapper").classList.toggle("hidden", !isRankings);
 
-      if (!isWeather && !isCountdown && !isRankings) updateConferenceSection();
+      if (!isWeather && !isCountdown && !isRankings) {
+        updateConferenceSection();
+      }
     }
 
     function updateTemp() {
@@ -278,10 +294,12 @@ HTML = """
 
     function addCity() {
       const city = document.getElementById("city-input").value.trim();
+
       if (city.length > 0 && !cityList.includes(city)) {
         cityList.push(city);
         updateCityListDisplay();
       }
+
       closeCityModal();
     }
 
@@ -293,6 +311,7 @@ HTML = """
     function updateCityListDisplay() {
       const container = document.getElementById("city-list");
       container.innerHTML = "";
+
       for (const city of cityList) {
         const div = document.createElement("div");
         div.className = "city-tag";
@@ -308,6 +327,7 @@ HTML = """
 
       const now = new Date();
       const year = now.getFullYear();
+
       let targetDate = null;
       let eventName = "";
 
@@ -316,25 +336,28 @@ HTML = """
           eventName = "Christmas";
           targetDate = new Date(year, 11, 25, 0, 0);
           break;
+
         case "easter":
           eventName = "Easter";
           targetDate = calculateEasterDate(year);
           break;
+
         case "halloween":
           eventName = "Halloween";
           targetDate = new Date(year, 9, 31, 0, 0);
           break;
+
         case "newyear":
           eventName = "New Year";
           targetDate = new Date(year + 1, 0, 1, 0, 0);
           break;
+
         default:
           return;
       }
 
       if (targetDate) {
-        const isoString = targetDate.toISOString().slice(0, 16);
-        datetimeInput.value = isoString;
+        datetimeInput.value = toLocalIsoString(targetDate);
         eventInput.value = eventName;
       }
     }
@@ -354,42 +377,75 @@ HTML = """
       const L = I - J;
       const month = 3 + f((L + 40) / 44);
       const day = L + 28 - 31 * f(month / 4);
+
       return new Date(year, month - 1, day, 0, 0);
     }
 
     async function setGamedayCountdown() {
       const input = document.getElementById("gameday-preset").value;
+      const eventInput = document.getElementById("countdown-event");
+      const datetimeInput = document.getElementById("countdown-datetime");
+
+      if (!input) {
+        countdown_sport = "";
+        countdown_league = "";
+        countdown_team = "";
+        countdown_abbr = "";
+        return;
+      }
+
       const [team, abbr, sport, league] = input.split('|');
+
       countdown_sport = sport;
       countdown_league = league;
       countdown_team = team;
       countdown_abbr = abbr;
 
-      const response = await fetch('/get_game_time', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({team, sport, league})
-      });
+      const eventName =
+        team.charAt(0).toUpperCase() +
+        team.slice(1) +
+        " Gameday!";
 
-      const data = await response.json();
+      eventInput.value = eventName;
 
-      const preset = document.getElementById("gameday-preset").value;
-      const eventInput = document.getElementById("countdown-event");
-      const datetimeInput = document.getElementById("countdown-datetime");
+      try {
+        const response = await fetch('/get_game_time', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            team: team,
+            abbr: abbr,
+            sport: sport,
+            league: league
+          })
+        });
 
-      const now = new Date();
-      let targetDate = null;
-      let eventName = "";
+        const data = await response.json();
 
-      eventName = team.charAt(0).toUpperCase() + team.slice(1) + " Gameday!";
-      targetDate = new Date(data.year, data.month-1, data.day, data.hour, data.minute);
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Unable to find upcoming game.");
+        }
 
-      if (targetDate) {
-        const isoString = toLocalIsoString(targetDate);
-        datetimeInput.value = isoString;
+        const targetDate = new Date(
+          data.year,
+          data.month - 1,
+          data.day,
+          data.hour,
+          data.minute
+        );
+
+        if (Number.isNaN(targetDate.getTime())) {
+          throw new Error("Invalid game date returned by server.");
+        }
+
+        datetimeInput.value = toLocalIsoString(targetDate);
         eventInput.value = eventName;
-      }
 
+      } catch (error) {
+        console.error("Error getting game time:", error);
+        datetimeInput.value = "";
+        alert(error.message);
+      }
     }
 
     window.onload = function () {
@@ -405,13 +461,16 @@ HTML = """
 
 process = None
 
+
 @app.route("/")
 def index():
     return render_template_string(HTML)
 
+
 @app.route("/start")
 def start_app():
     global process
+
     if not process or process.poll() is not None:
         mlb = "MLB" in request.args
         nba = "NBA" in request.args
@@ -421,11 +480,13 @@ def start_app():
         ncaaf_rankings = "NCAAFRankings" in request.args
         ncaab_rankings = "NCAABRankings" in request.args
         nfl = "NFL" in request.args
+
         mode = request.args.get("mode", "sports")
         cities = request.args.getlist("city")
         conferences = request.args.getlist("conf")
 
         cmd = ["sudo", "../RaspberryPI/./espn_jsonc"]
+
         if mode == "sports":
             if mlb:
                 cmd.append("--mlb")
@@ -447,6 +508,7 @@ def start_app():
 
         elif mode == "countdown":
             cmd.append("--countdown_display")
+
             event = request.args.get("event")
             month = request.args.get("month")
             day = request.args.get("day")
@@ -456,15 +518,25 @@ def start_app():
             league = request.args.get("league")
             team = request.args.get("team")
             team_abbr = request.args.get("team_abbr")
+
             if event:
                 cmd += ["--event", event]
+
             if month and day and hour and minute:
-                cmd += ["--month", month, "--day", day, "--hour", hour, "--minute", minute]
+                cmd += [
+                    "--month", month,
+                    "--day", day,
+                    "--hour", hour,
+                    "--minute", minute
+                ]
+
             if sport:
                 cmd += ["--countdown_sport", sport]
+
             if league:
                 cmd += ["--countdown_league", league]
-            if team:
+
+            if team_abbr:
                 cmd += ["--countdown_team", team_abbr]
 
         elif mode == "rankings":
@@ -474,7 +546,7 @@ def start_app():
                 cmd.append("--mens-college-basketball-rankings")
 
         for conf_entry in conferences:
-            if '|' in conf_entry:
+            if "|" in conf_entry:
                 conf, sport = conf_entry.split("|", 1)
                 cmd += ["--conference", conf, "--sport", sport]
             else:
@@ -486,72 +558,166 @@ def start_app():
 
         process = subprocess.Popen(cmd)
         return "App started."
+
     return "App already running."
+
 
 @app.route("/stop")
 def stop_app():
     global process
+
     if process and process.poll() is None:
         process.terminate()
         return "App stopped."
+
     return "App not running."
+
 
 @app.route("/temperature")
 def get_temperature():
     try:
-        output = subprocess.check_output(["vcgencmd", "measure_temp"]).decode()
-        temp_str = output.strip().replace("temp=", "").replace("'C", "")
+        output = subprocess.check_output(
+            ["vcgencmd", "measure_temp"]
+        ).decode()
+
+        temp_str = (
+            output.strip()
+            .replace("temp=", "")
+            .replace("'C", "")
+        )
+
         temp_c = float(temp_str)
         temp_f = (temp_c * 9 / 5) + 32
-        return jsonify({"temp_f": round(temp_f, 1)})
+
+        return jsonify({
+            "temp_f": round(temp_f, 1)
+        })
+
     except Exception as e:
-        return jsonify({"temp_f": "N/A", "error": str(e)})
+        return jsonify({
+            "temp_f": "N/A",
+            "error": str(e)
+        })
 
-@app.route("/get_game_time", methods=['POST'])
-def get_next_game_time(timezone='US/Central'):
+
+def find_next_game(team_abbr, sport, league, timezone_name="US/Central"):
     """
-    Fetches the next scheduled game time for the given team.
-
-    Args:
-        team_name (str): Full or partial name of the team (e.g., "Nebraska").
-        sport (str): Sport name (e.g., "football", "basketball", "baseball").
-        league (str): League name (e.g., "college-football", "mlb", "nba").
-        timezone (str): Timezone to convert game time to (default 'US/Central').
-
-    Returns:
-        str: Formatted game time or message if not found.
+    Find the earliest future game from ESPN's team schedule endpoint.
     """
-    data = request.get_json()
-    team_name = data.get('team')
-    sport = data.get('sport')
-    league = data.get('league')
+    now_utc = datetime.now(timezone.utc)
+    local_timezone = pytz.timezone(timezone_name)
+    candidate_games = []
 
-    url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard"
+    for season in (now_utc.year, now_utc.year + 1):
+        url = (
+            f"https://site.api.espn.com/apis/site/v2/sports/"
+            f"{sport}/{league}/teams/{team_abbr}/schedule"
+        )
+
+        response = requests.get(
+            url,
+            params={"season": season},
+            timeout=10
+        )
+        response.raise_for_status()
+
+        schedule_data = response.json()
+
+        for event in schedule_data.get("events", []):
+            game_time = event.get("date")
+
+            if not game_time:
+                continue
+
+            try:
+                dt = datetime.fromisoformat(
+                    game_time.replace("Z", "+00:00")
+                )
+            except ValueError:
+                continue
+
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+
+            if dt > now_utc:
+                candidate_games.append((dt, event))
+
+    if not candidate_games:
+        return None
+
+    candidate_games.sort(key=lambda item: item[0])
+    game_time_utc, event = candidate_games[0]
+    local_time = game_time_utc.astimezone(local_timezone)
+
+    return local_time, event
+
+
+@app.route("/get_game_time", methods=["POST"])
+def get_next_game_time():
     try:
-        resp = requests.get(url)
-        resp.raise_for_status()
-        data = resp.json()
+        data = request.get_json(silent=True) or {}
 
-        for event in data.get('events', []):
-            for competitor in event['competitions'][0]['competitors']:
-                if team_name.lower() in competitor['team']['displayName'].lower():
-                    game_time = event['date']
-                    dt = datetime.fromisoformat(game_time.replace('Z', '+00:00'))
-                    local_time = dt.astimezone(pytz.timezone(timezone))
+        team_name = str(data.get("team", "")).strip()
+        team_abbr = str(data.get("abbr", "")).strip()
+        sport = str(data.get("sport", "")).strip()
+        league = str(data.get("league", "")).strip()
 
-                    data = {
-                        'year': local_time.year,
-                        'month': local_time.month,
-                        'day': local_time.day,
-                        'hour': local_time.hour,
-                        'minute': local_time.minute,
-                    }
-         
-                    return jsonify(data)
+        if not team_name:
+            return jsonify({
+                "success": False,
+                "error": "Team name was not provided."
+            }), 400
 
-        return f"No upcoming game found for {team_name}."
+        if not team_abbr:
+            return jsonify({
+                "success": False,
+                "error": "Team abbreviation was not provided."
+            }), 400
+
+        if not sport or not league:
+            return jsonify({
+                "success": False,
+                "error": "Sport or league was not provided."
+            }), 400
+
+        result = find_next_game(
+            team_abbr,
+            sport,
+            league
+        )
+
+        if result is None:
+            return jsonify({
+                "success": False,
+                "error": f"No upcoming game found for {team_name}."
+            }), 404
+
+        local_time, event = result
+
+        return jsonify({
+            "success": True,
+            "year": local_time.year,
+            "month": local_time.month,
+            "day": local_time.day,
+            "hour": local_time.hour,
+            "minute": local_time.minute,
+            "event_id": event.get("id"),
+            "event_name": event.get("name", ""),
+            "short_name": event.get("shortName", "")
+        })
+
+    except requests.RequestException as e:
+        return jsonify({
+            "success": False,
+            "error": f"Error contacting ESPN: {e}"
+        }), 502
+
     except Exception as e:
-        return f"Error fetching game: {e}"
+        return jsonify({
+            "success": False,
+            "error": f"Error fetching game: {e}"
+        }), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
