@@ -433,7 +433,9 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
         draw_baseball(competitions[competition_index[1]], 0, images_dir);
     }
 
-//    canvas = matrix->SwapOnVSync(canvas);
+#ifndef MAC_STUB_MATRIX
+    canvas = matrix->SwapOnVSync(canvas);
+#endif
 
     // Reset the First Pass Flag
     first_pass = false;
