@@ -14,9 +14,7 @@
 #include <unordered_map>
 #include <ctime>
 #include <chrono>
-
-
-#ifdef MAC_STUB_MATRIX
+#include "led-matrix.h"
 
 #include <unistd.h>
 
@@ -26,6 +24,8 @@
 
 using namespace rgb_matrix;
 using namespace Magick;
+
+#ifdef MAC_STUB_MATRIX
 
 static bool enterPressedNonBlocking() {
 
@@ -131,8 +131,6 @@ int getCollegeFootballWeek(bool count_prev_bowls = false) {
     if (count_prev_bowls && seasonType == 1) {
         week = regularSeasonWeeks;
     }
-
-    printf("\nCurrent CFB Week (normalized): %i\n", week);
 
     return week;
 }

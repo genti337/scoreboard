@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <chrono>
 
 #include "led-matrix.h"
 #include "graphics.h"
