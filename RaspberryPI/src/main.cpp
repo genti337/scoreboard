@@ -319,7 +319,7 @@ void display_loop(std::atomic<bool>& running,
     RGBMatrix::Options options;
     options.rows = 32;
     options.cols = 64;
-    options.chain_length = 5;
+    options.chain_length = 2;
     options.parallel = 1;
 //    options.hardware_mapping = hardware_mapping.c_str();
     options.pwm_bits = 11; //8;
@@ -457,7 +457,11 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
+#ifdef MAC_STUB_MATRIX
+    SportsDisplay display(32, 64, 2, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+#else
     SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+#endif
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
