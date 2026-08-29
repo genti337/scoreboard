@@ -203,8 +203,8 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             ctx = "events[" + std::to_string(ei) + "].competitions[0].status.period";
             game.period = std::to_string(comp.at("status").at("period").get<int>());
 
-//FIXME            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
-//FIXME            game.clock = comp.at("status").at("displayClock").get<std::string>();
+            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
+            game.clock = comp.at("status").at("displayClock").get<std::string>();
 
             // Date/time
             ctx = "events[" + std::to_string(ei) + "].competitions[0].date";
