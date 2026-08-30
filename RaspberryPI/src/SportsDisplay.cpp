@@ -511,15 +511,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        draw_text(font, "Final", x_offset, 32, rgb_matrix::Color(255, 255, 255));
     }
 
-
-
-
-
-//FIXME    // Draw the Football Field
-//FIXME    drawImage("../images/football_field2.bmp", 32, 24);
-//FIXME    drawImage("../images/football_outline_5x3.bmp", 32 + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 27);
-//FIXME    std::cout << competition.yard_line << "\n";
-
     return;
 }
 
@@ -561,18 +552,19 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
 }
 
 void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display) {
-#ifndef MAC_STUB_MATRIX
-    // Clear the Canvas for Update
-    canvas->Clear();
-#endif
 
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);
 
-    // Draw Touchdown
-    draw_touchdown(images_dir);
+//    // Draw Touchdown
+//    draw_touchdown(images_dir);
 
     if (scroll_display) {
+        #ifndef MAC_STUB_MATRIX
+            // Clear the Canvas for Update
+            canvas->Clear();
+        #endif
+
 
         // Draw the Competitions
         for (int i=0; i<4; i++) {
@@ -616,14 +608,19 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
 
         auto now = std::chrono::steady_clock::now();
         if (now - last_index_update >= std::chrono::seconds(10)) {
+           #ifndef MAC_STUB_MATRIX
+               // Clear the Canvas for Update
+               canvas->Clear();
+           #endif
+
            last_index_update = std::chrono::steady_clock::now();
            competition_index[1] += 1;
-        }
 
-        if (competitions[competition_index[1]].sport == "baseball") {
-           draw_baseball(competitions[competition_index[1]], 0, images_dir);
-        } else if (competitions[competition_index[1]].sport == "football") {
-           draw_football2(competitions[competition_index[1]], 0, images_dir);
+           if (competitions[competition_index[1]].sport == "baseball") {
+              draw_baseball(competitions[competition_index[1]], 0, images_dir);
+           } else if (competitions[competition_index[1]].sport == "football") {
+              draw_football2(competitions[competition_index[1]], 0, images_dir);
+           }
         }
     }
 
