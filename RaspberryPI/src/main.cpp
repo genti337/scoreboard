@@ -319,7 +319,7 @@ void display_loop(std::atomic<bool>& running,
     RGBMatrix::Options options;
     options.rows = 32;
     options.cols = 64;
-    options.chain_length = 2;
+    options.chain_length = 4;
     options.parallel = 1;
 //    options.hardware_mapping = hardware_mapping.c_str();
     options.pwm_bits = 11; //8;
@@ -367,9 +367,9 @@ void display_loop(std::atomic<bool>& running,
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
-    	        display.draw(competitions2, "../images/", true);
+    	        display.draw(competitions2, "../images/", false);
             } else if (update_index == 1 && competitions1.size() > 0) {
-    	        display.draw(competitions1, "../images/", true);
+    	        display.draw(competitions1, "../images/", false);
             }
 
 //            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
@@ -458,7 +458,7 @@ int main(int argc, char* argv[]) {
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
 #ifdef MAC_STUB_MATRIX
-    SportsDisplay display(32, 64, 2, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    SportsDisplay display(32, 64, 4, "adafruit-hat", active_display == "sports" || active_display == "rankings");
 #else
     SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
 #endif

@@ -25,6 +25,7 @@ public:
     std::string down_dist;      //
     std::string possession_text;   //
     std::string possession_id;		// Posession Team ID
+    int yard_line;		// Posession Team ID
 
     Team HomeTeam;
     Team AwayTeam;

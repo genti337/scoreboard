@@ -149,38 +149,47 @@ void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
 //}
 
 void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
+
     Magick::Image image;
 
     try {
-       image.read(path);
+        image.read(path);
+
     } catch (const Magick::Exception &error) {
-       std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
-       return;
+        std::cerr << "Failed to read image " << path
+
+                  << ": " << error.what() << std::endl;
+
+        return;
     }
 
     image.type(Magick::TrueColorType);
-//    image.flip();              // Optional: Flip vertically
-    image.modifyImage();       // Allow pixel access
+
+    image.modifyImage();
 
     for (size_t y = 0; y < image.rows(); ++y) {
         for (size_t x = 0; x < image.columns(); ++x) {
-            const Magick::ColorRGB color = image.pixelColor(x, y);
+            const Magick::ColorRGB color(image.pixelColor(x, y));
+            uint8_t r = static_cast<uint8_t>(color.red()   * 255);
+            uint8_t g = static_cast<uint8_t>(color.green() * 255);
+            uint8_t b = static_cast<uint8_t>(color.blue()  * 255);
+
+            // Treat black pixels as transparent / blank
+            if (r == 0 && g == 0 && b == 0) {
+                continue;
+            }
 
             int draw_x = static_cast<int>(x) + offset_x;
             int draw_y = static_cast<int>(y) + offset_y;
 
-            // Optional: skip out-of-bounds pixels
             if (draw_x >= 0 && draw_x < canvas->width() &&
                 draw_y >= 0 && draw_y < canvas->height()) {
-                canvas->SetPixel(draw_x, draw_y,
-                                 static_cast<uint8_t>(color.red() * 255),
-                                 static_cast<uint8_t>(color.green() * 255),
-                                 static_cast<uint8_t>(color.blue() * 255));
+                canvas->SetPixel(draw_x, draw_y, r, g, b);
             }
         }
     }
 
-    max_display_x = std::max(max_display_x, offset_x + int(image.columns()));
+    max_display_x = std::max(max_display_x, offset_x + static_cast<int>(image.columns()));
 }
 
 void Display::drawImageCentered(const std::string& path, int offset_x, int min_y, int max_y) {

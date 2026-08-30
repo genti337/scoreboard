@@ -284,6 +284,12 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                         ctx += ".possession";
                         game.possession_id = sit.at("possession").get<std::string>();
                     }
+                    // Current field position
+                    if (sit.contains("yardLine") && !sit.at("yardLine").is_null()) {
+
+                        game.yard_line = sit.at("yardLine").get<int>();
+
+                    }
                 }
             }
 

@@ -21,9 +21,13 @@ public:
     void update_x_offset(std::vector<Competition> competitions, int index);
     void update_x_offset(std::vector<Team> rankings, int index);
     std::string format_quarter_time(const std::string& shortDetail);
+    bool determinePossessionDirection(int yardLine,
+                                      const std::string& possessionText,
+                                      const std::string& possessionTeamAbbrev);
     void draw_baseball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
+    void draw_football2(Competition& competition, int x_init, const std::string& images_dir);
     void draw_touchdown(const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);

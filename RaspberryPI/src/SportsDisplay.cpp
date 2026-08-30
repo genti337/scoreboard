@@ -100,6 +100,42 @@ std::string SportsDisplay::format_quarter_time(const std::string& shortDetail) {
     }
 }
 
+bool SportsDisplay::determinePossessionDirection(int yardLine,
+                                                 const std::string& possessionText,
+                                                 const std::string& possessionTeamAbbrev)
+
+{
+
+    // Extract team abbreviation from possessionText.
+
+    // Example: "JXST 23" -> "JXST"
+
+    std::string fieldSideTeam;
+
+    std::istringstream iss(possessionText);
+
+    iss >> fieldSideTeam;
+
+    // Is the ball on the possessing team's side of the field?
+    bool ownTerritory = (fieldSideTeam == possessionTeamAbbrev);
+
+    if (ownTerritory) {
+        // Possessing team's own end zone is the nearest end.
+        // If they're on the 0-49 half, they're driving right.
+        // If they're on the 51-100 half, they're driving left.
+
+        return yardLine < 50;
+    }
+
+    // Ball is on opponent's side.
+
+    // If it's on the 51-100 half, offense is driving right.
+
+    // If it's on the 0-49 half, offense is driving left.
+
+    return yardLine > 50;
+}
+
 void SportsDisplay::draw_baseball(Competition& competition, int x_init, const std::string& images_dir) {
     // Reset the Maximum X
     max_display_x = -999;
@@ -338,6 +374,155 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
     return;
 }
 
+void SportsDisplay::draw_football2(Competition& competition, int x_init, const std::string& images_dir) {
+    // Local varibales for x_offset
+    int x_offset = 0;
+    int endzone_offset = 6;
+    int field_width = 54;
+    int ball_width = 6;
+    bool goingRight = false;
+    std::string yard_text;
+    double ball_location = static_cast<double>(competition.yard_line);
+
+    // Reset the Maximum X
+    max_display_x = -999;
+
+    // Team Logos and Ranks
+    if (competition.AwayTeam.rank < 99) {
+        draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
+    std::ostringstream oss1("");
+    oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
+    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
+    center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
+
+    if (competition.HomeTeam.rank < 99) {
+        x_offset = max_display_x - getTextWidth(font, std::to_string(competition.HomeTeam.rank));
+        draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
+    }
+
+    std::ostringstream oss2("");
+    oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
+    drawImageCentered(oss2.str(), max_display_x, 0, 32);
+
+    // Team Abbreviations and Records
+    x_offset = max_display_x + 8;
+    draw_text(abbr_font, competition.AwayTeam.abbr, x_offset, 10, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
+    draw_text(small_font, competition.AwayTeam.record, x_offset+1, 16, rgb_matrix::Color(255, 255, 255));
+    draw_text(abbr_font, competition.HomeTeam.abbr, x_offset, 26, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
+    draw_text(small_font, competition.HomeTeam.record, x_offset+1, 32, rgb_matrix::Color(255, 255, 255));
+
+    // Current X-Offset
+    x_offset = max_display_x + 8;
+
+    // Pre Game Display
+    if (competition.state == "pre") {
+       draw_text(font, competition.day, x_offset, 8, rgb_matrix::Color(255, 255, 255));
+       draw_text(font, competition.date, x_offset, 20, rgb_matrix::Color(255, 255, 255));
+       draw_text(font, competition.time, x_offset, 32, rgb_matrix::Color(255, 255, 255));
+    // Active Game Display
+    } else if (competition.state == "in") {
+       // Team Scores
+       draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
+       draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
+
+       // Possession Arrow
+       std::ostringstream oss3("");
+       oss3 << images_dir << "possession_football.bmp";
+       x_offset = max_display_x + 4;
+       if (competition.AwayTeam.team_id == competition.possession_id) {
+          drawImage(oss3.str(), x_offset, 10);
+       } else {
+          drawImage(oss3.str(), x_offset, -3);
+       }
+
+       // Draw the Football Field
+       x_offset = max_display_x + 8;
+       drawImage("../images/football_field2.bmp", x_offset, 20);
+       drawImage("../images/football_small.bmp", x_offset + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 27);
+
+       // Period
+       std::string test = "Q";
+       center_text(game_font,
+                   "Q" + competition.period + " " + competition.clock,
+                   x_offset - 8,
+                   max_display_x,
+                   7,
+                   rgb_matrix::Color(255, 255, 255));
+
+       center_text(game_font,
+                   competition.possession_text,
+                   x_offset,
+                   max_display_x,
+                   17,
+                   rgb_matrix::Color(255, 255, 255));
+
+       if (competition.yard_line <= 50) {
+          yard_text = std::to_string(competition.yard_line); 
+       } else {
+          yard_text = std::to_string(competition.yard_line - 50); 
+       }
+
+       // Determine what direction the posessing team is driving
+       if (competition.AwayTeam.team_id == competition.possession_id) {
+       	center_text(small_font, 
+       	            yard_text,
+       	            x_offset + endzone_offset - (ball_width / 2) + std::round ((ball_location / 100) * field_width),
+       	            x_offset + endzone_offset + (ball_width / 2) + std::round ((ball_location / 100) * field_width),
+       	            24,
+       	            brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
+       } else {
+       	center_text(small_font, 
+       	            yard_text,
+       	            x_offset + endzone_offset - (ball_width / 2) + std::round ((ball_location / 100) * field_width),
+       	            x_offset + endzone_offset + (ball_width / 2) + std::round ((ball_location / 100) * field_width),
+       	            24,
+       	            brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
+       }
+
+       // Determine what direction the posessing team is driving
+       if (competition.AwayTeam.team_id == competition.possession_id) {
+          goingRight = determinePossessionDirection(competition.yard_line, competition.possession_text, competition.AwayTeam.abbr);
+       } else {
+          goingRight = determinePossessionDirection(competition.yard_line, competition.possession_text, competition.HomeTeam.abbr);
+       }
+
+       goingRight = false;
+       if (goingRight) {
+           drawImage("../images/arrow_right.bmp", x_offset + endzone_offset + (ball_width / 2) + std::round((ball_location / 100) * field_width), 24);
+       } else {
+           drawImage("../images/arrow_left.bmp", x_offset + endzone_offset - ball_width - 1 + std::round((ball_location / 100) * field_width), 24);
+       }
+
+    // Post Game Display
+    } else if (competition.state == "post") {
+       draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
+       draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
+
+       std::ostringstream oss3("");
+       oss3 << images_dir << "arrow.bmp";
+       if (std::stoi(competition.AwayTeam.score) > std::stoi(competition.HomeTeam.score)) {
+          drawImage(oss3.str(), max_display_x+2, 0);
+       } else if (std::stoi(competition.AwayTeam.score) < std::stoi(competition.HomeTeam.score)) {
+          drawImage(oss3.str(), max_display_x+2, 12);
+       }
+
+       draw_text(font, "Final", x_offset, 32, rgb_matrix::Color(255, 255, 255));
+    }
+
+
+
+
+
+//FIXME    // Draw the Football Field
+//FIXME    drawImage("../images/football_field2.bmp", 32, 24);
+//FIXME    drawImage("../images/football_outline_5x3.bmp", 32 + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 27);
+//FIXME    std::cout << competition.yard_line << "\n";
+
+    return;
+}
+
 
 void SportsDisplay::draw_touchdown(const std::string& images_dir) {
 
@@ -435,7 +620,11 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
            competition_index[1] += 1;
         }
 
-        draw_baseball(competitions[competition_index[1]], 0, images_dir);
+        if (competitions[competition_index[1]].sport == "baseball") {
+           draw_baseball(competitions[competition_index[1]], 0, images_dir);
+        } else if (competitions[competition_index[1]].sport == "football") {
+           draw_football2(competitions[competition_index[1]], 0, images_dir);
+        }
     }
 
 #ifndef MAC_STUB_MATRIX
