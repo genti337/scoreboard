@@ -377,9 +377,9 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
 void SportsDisplay::draw_football2(Competition& competition, int x_init, const std::string& images_dir) {
     // Local varibales for x_offset
     int x_offset = 0;
-    int endzone_offset = 6;
-    int field_width = 54;
-    int ball_width = 6;
+    int endzone_offset = 12;
+    int field_width = 105;
+    int ball_width = 7;
     bool goingRight = false;
     std::string yard_text;
     double ball_location = static_cast<double>(competition.yard_line);
@@ -439,45 +439,45 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 
        // Draw the Football Field
        x_offset = max_display_x + 8;
-       drawImage("../images/football_field2.bmp", x_offset, 20);
-       drawImage("../images/football_small.bmp", x_offset + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 27);
+       drawImage("../images/football_field.bmp", x_offset, 8);
+       drawImage("../images/football_small.bmp", x_offset + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 23);
 
        // Period
        std::string test = "Q";
        center_text(game_font,
                    "Q" + competition.period + " " + competition.clock,
-                   x_offset - 8,
+                   x_offset,
                    max_display_x,
-                   7,
+                   6,
                    rgb_matrix::Color(255, 255, 255));
 
        center_text(game_font,
                    competition.possession_text,
                    x_offset,
                    max_display_x,
-                   17,
+                   15,
                    rgb_matrix::Color(255, 255, 255));
 
        if (competition.yard_line <= 50) {
           yard_text = std::to_string(competition.yard_line); 
        } else {
-          yard_text = std::to_string(competition.yard_line - 50); 
+          yard_text = std::to_string(100 - competition.yard_line); 
        }
 
        // Determine what direction the posessing team is driving
        if (competition.AwayTeam.team_id == competition.possession_id) {
        	center_text(small_font, 
        	            yard_text,
-       	            x_offset + endzone_offset - (ball_width / 2) + std::round ((ball_location / 100) * field_width),
-       	            x_offset + endzone_offset + (ball_width / 2) + std::round ((ball_location / 100) * field_width),
-       	            24,
+       	            x_offset + endzone_offset - (ball_width / 2) + 1 + std::round ((ball_location / 100) * field_width),
+       	            x_offset + endzone_offset + (ball_width / 2) + 1 + std::round ((ball_location / 100) * field_width),
+       	            22,
        	            brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
        } else {
        	center_text(small_font, 
        	            yard_text,
-       	            x_offset + endzone_offset - (ball_width / 2) + std::round ((ball_location / 100) * field_width),
-       	            x_offset + endzone_offset + (ball_width / 2) + std::round ((ball_location / 100) * field_width),
-       	            24,
+       	            x_offset + endzone_offset - (ball_width / 2) + 1 + std::round ((ball_location / 100) * field_width),
+       	            x_offset + endzone_offset + (ball_width / 2) + 1 + std::round ((ball_location / 100) * field_width),
+       	            22,
        	            brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
        }
 
@@ -490,9 +490,47 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 
        goingRight = false;
        if (goingRight) {
-           drawImage("../images/arrow_right.bmp", x_offset + endzone_offset + (ball_width / 2) + std::round((ball_location / 100) * field_width), 24);
+           drawImage("../images/arrow_right.bmp", x_offset + endzone_offset + (ball_width / 2) + 3 + std::round((ball_location / 100) * field_width), 23);
        } else {
-           drawImage("../images/arrow_left.bmp", x_offset + endzone_offset - ball_width - 1 + std::round((ball_location / 100) * field_width), 24);
+           drawImage("../images/arrow_left.bmp", x_offset + endzone_offset - ball_width - 1 + std::round((ball_location / 100) * field_width), 23);
+       }
+
+       // End zone colors
+       rgb_matrix::Color endzone =
+           brighterHex(competition.HomeTeam.color,
+                       competition.HomeTeam.alt_color);
+       
+       // Coordinates within football_field2.bmp
+       const int left_endzone_x  = 6;
+       const int right_endzone_x = 119;
+       
+       const int endzone_width  = 5;
+       const int endzone_height = 4;
+       
+       const int field_y = 28;
+       
+       // Left end zone
+       for (int y = field_y; y < field_y + endzone_height; ++y) {
+           for (int x = x_offset + left_endzone_x;
+                x < x_offset + left_endzone_x + endzone_width;
+                ++x) {
+               canvas->SetPixel(x, y,
+                                endzone.r,
+                                endzone.g,
+                                endzone.b);
+           }
+       }
+       
+       // Right end zone
+       for (int y = field_y; y < field_y + endzone_height; ++y) {
+           for (int x = x_offset + right_endzone_x;
+                x < x_offset + right_endzone_x + endzone_width;
+                ++x) {
+               canvas->SetPixel(x, y,
+                                endzone.r,
+                                endzone.g,
+                                endzone.b);
+           }
        }
 
     // Post Game Display
@@ -604,29 +642,39 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
            }
     
         }
+
+        #ifndef MAC_STUB_MATRIX
+            canvas = matrix->SwapOnVSync(canvas);
+        #endif
     } else {
 
         auto now = std::chrono::steady_clock::now();
-        if (now - last_index_update >= std::chrono::seconds(10)) {
-           #ifndef MAC_STUB_MATRIX
-               // Clear the Canvas for Update
-               canvas->Clear();
-           #endif
+        if (first_pass || (now - last_index_update >= std::chrono::seconds(10))) {
 
            last_index_update = std::chrono::steady_clock::now();
-           competition_index[1] += 1;
+           competition_index[1] = (competition_index[1] + 1) % competitions.size();
 
            if (competitions[competition_index[1]].sport == "baseball") {
               draw_baseball(competitions[competition_index[1]], 0, images_dir);
            } else if (competitions[competition_index[1]].sport == "football") {
               draw_football2(competitions[competition_index[1]], 0, images_dir);
+
+              int display_width = max_display_x;
+              int centered_x = (canvas->width() - display_width) / 2;
+
+              #ifndef MAC_STUB_MATRIX
+                  // Clear the Canvas for Update
+                  canvas->Clear();
+              #endif
+
+              draw_football2(competitions[competition_index[1]], centered_x, images_dir);
            }
+
+           #ifndef MAC_STUB_MATRIX
+               canvas = matrix->SwapOnVSync(canvas);
+           #endif
         }
     }
-
-#ifndef MAC_STUB_MATRIX
-    canvas = matrix->SwapOnVSync(canvas);
-#endif
 
     // Reset the First Pass Flag
     first_pass = false;
