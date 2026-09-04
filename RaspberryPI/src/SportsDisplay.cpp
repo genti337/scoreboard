@@ -488,7 +488,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
           goingRight = determinePossessionDirection(competition.yard_line, competition.possession_text, competition.HomeTeam.abbr);
        }
 
-       goingRight = false;
        if (goingRight) {
            drawImage("../images/arrow_right.bmp", x_offset + endzone_offset + (ball_width / 2) + 3 + std::round((ball_location / 100) * field_width), 23);
        } else {
@@ -598,11 +597,8 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
 //    draw_touchdown(images_dir);
 
     if (scroll_display) {
-        #ifndef MAC_STUB_MATRIX
-            // Clear the Canvas for Update
-            canvas->Clear();
-        #endif
-
+        // Clear the Canvas for Update
+        canvas->Clear();
 
         // Draw the Competitions
         for (int i=0; i<4; i++) {
@@ -643,9 +639,7 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
     
         }
 
-        #ifndef MAC_STUB_MATRIX
-            canvas = matrix->SwapOnVSync(canvas);
-        #endif
+        canvas = matrix->SwapOnVSync(canvas);
     } else {
 
         auto now = std::chrono::steady_clock::now();
@@ -662,17 +656,13 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
               int display_width = max_display_x;
               int centered_x = (canvas->width() - display_width) / 2;
 
-              #ifndef MAC_STUB_MATRIX
-                  // Clear the Canvas for Update
-                  canvas->Clear();
-              #endif
+              // Clear the Canvas for Update
+              canvas->Clear();
 
               draw_football2(competitions[competition_index[1]], centered_x, images_dir);
            }
 
-           #ifndef MAC_STUB_MATRIX
-               canvas = matrix->SwapOnVSync(canvas);
-           #endif
+           canvas = matrix->SwapOnVSync(canvas);
         }
     }
 
@@ -685,10 +675,8 @@ void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::stri
     // Number of Ranks to Draw
     num_rank_display = std::min(int(rankings.size()), 4);
 
-#ifndef MAC_STUB_MATRIX
     // Clear the Canvas for Update
     canvas->Clear();
-#endif
 
     // Draw the Rankings
     for (int i=0; i<4; i++) {

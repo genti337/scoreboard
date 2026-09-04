@@ -339,7 +339,6 @@ void display_loop(std::atomic<bool>& running,
 
     while (running) {
 #ifdef MAC_STUB_MATRIX
-	canvas->Clear();
 	display.setCanvas(canvas);
 	weather_display.setCanvas(canvas);
 #endif
@@ -375,9 +374,6 @@ void display_loop(std::atomic<bool>& running,
 //            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
         }
 
-#ifdef MAC_STUB_MATRIX
-    	canvas = matrix->SwapOnVSync(canvas);
-#endif
 
     	std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
     	//std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
