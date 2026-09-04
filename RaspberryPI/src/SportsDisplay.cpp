@@ -7,7 +7,7 @@ using namespace Magick;
 
 auto last_index_update = std::chrono::steady_clock::now();
 
-SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active) : 
+SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active, bool scrolling) : 
     Display(rows, cols, chain_length, hardware_mapping, active) {
 
     // Load Fonts specific to Sports Display
@@ -37,6 +37,9 @@ SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::st
     x_init[1] = 128;
     x_init[2] = 128;
     x_init[3] = 128;
+
+    // Scrolling
+    scroll_display = scrolling;
 }
 
 SportsDisplay::~SportsDisplay() {
@@ -588,7 +591,7 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
     ranking.game_display_width = max_display_x - x_init;
 }
 
-void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display) {
+void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir) {
 
     // Number of Competitions to Draw
     num_comp_display = std::min(int(competitions.size()), 4);

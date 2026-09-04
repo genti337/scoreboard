@@ -366,9 +366,9 @@ void display_loop(std::atomic<bool>& running,
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
-    	        display.draw(competitions2, "../images/", false);
+    	        display.draw(competitions2, "../images/");
             } else if (update_index == 1 && competitions1.size() > 0) {
-    	        display.draw(competitions1, "../images/", false);
+    	        display.draw(competitions1, "../images/");
             }
 
 //            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
@@ -400,6 +400,8 @@ int main(int argc, char* argv[]) {
     std::string countdown_sport = "";
     std::string countdown_league = "";
     std::string countdown_team = "";
+
+    bool scrolling = false;
 
     // Parse Input Arguments
     for (int i=1; i<argc; i++) {
@@ -444,6 +446,8 @@ int main(int argc, char* argv[]) {
            sports.push_back(sport_args[flag].first);
            leagues.push_back(sport_args[flag].second);
            active_display = "sports";
+       } else if (arg == "--scrolling") {
+          scrolling = true;
        }
     }
 
@@ -454,9 +458,9 @@ int main(int argc, char* argv[]) {
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
 #ifdef MAC_STUB_MATRIX
-    SportsDisplay display(32, 64, 4, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    SportsDisplay display(32, 64, 4, "adafruit-hat", active_display == "sports" || active_display == "rankings", scrolling);
 #else
-    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings", scrolling);
 #endif
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");

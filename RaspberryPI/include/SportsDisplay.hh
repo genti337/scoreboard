@@ -14,7 +14,7 @@
 
 class SportsDisplay : public Display {
 public:
-    SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
+    SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active, bool scrolling);
     ~SportsDisplay();
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);
@@ -31,7 +31,7 @@ public:
     void draw_touchdown(const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void draw(std::vector<Competition>& competitions, const std::string& images_dir, bool scroll_display);
+    void draw(std::vector<Competition>& competitions, const std::string& images_dir);
     void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
 
 private:
@@ -58,6 +58,8 @@ private:
 
     int num_comp_display;
     int num_rank_display;
+
+    bool scroll_display;
 };
 
 #endif
