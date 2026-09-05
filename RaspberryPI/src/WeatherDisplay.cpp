@@ -55,7 +55,6 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
 }
 
 WeatherDisplay::~WeatherDisplay() {
-    delete matrix;
 }
 
 void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
@@ -93,7 +92,7 @@ void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
     drawImage(oss.str(), offset_x, offset_y);
 }
 
-int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir) {
+int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir) {
     // Display Update Index
     if (update_index >= 2) {
        update_index = 0;
@@ -111,9 +110,6 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
 
     // Reset the Max Display X-Offset
     max_display_x = 0;
-
-    // Clear the Canvas for Update
-    canvas->Clear();
 
     // Current Weather
     draw_text(font, city, 0, 8, rgb_matrix::Color(255, 255, 255));
@@ -171,9 +167,6 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
         x_offset += 24;
     }
 
-    // Update the Canvas
-    canvas = matrix->SwapOnVSync(canvas);
-
     // Reset the First Pass Flag
     first_pass = false;
 
@@ -185,14 +178,14 @@ int WeatherDisplay::render(std::string city, std::vector<Weather>& weather_data,
 }
 
 
-void WeatherDisplay::render_text(std::string text) {
+void WeatherDisplay::draw_weather_text(std::string text) {
     // Clear the Canvas for Update
-    canvas->Clear();
+//    canvas->Clear();
 
     center_text(temp_font, text, 0, 5*64, 20);
 
     // Update the Canvas
-    canvas = matrix->SwapOnVSync(canvas);
+//    canvas = matrix->SwapOnVSync(canvas);
 
     return;
 }

@@ -24,7 +24,6 @@ CountdownDisplay::CountdownDisplay(int rows, int cols, int chain_length, const s
 }
 
 CountdownDisplay::~CountdownDisplay() {
-    delete matrix;
 }
 
 void CountdownDisplay::set_sport(std::string ext_sport, std::string ext_league, std::string ext_team) {

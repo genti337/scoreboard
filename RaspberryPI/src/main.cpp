@@ -14,6 +14,52 @@
 #include <unordered_map>
 #include <ctime>
 #include <chrono>
+#include "led-matrix.h"
+
+#include <unistd.h>
+
+#include <sys/select.h>
+
+#include "led-matrix.h"
+
+using namespace rgb_matrix;
+using namespace Magick;
+
+#ifdef MAC_STUB_MATRIX
+
+static bool enterPressedNonBlocking() {
+
+    fd_set set;
+
+    struct timeval timeout;
+
+    FD_ZERO(&set);
+
+    FD_SET(STDIN_FILENO, &set);
+
+    timeout.tv_sec = 0;
+
+    timeout.tv_usec = 0;
+
+    int rv = select(STDIN_FILENO + 1, &set, nullptr, nullptr, &timeout);
+
+    if (rv > 0 && FD_ISSET(STDIN_FILENO, &set)) {
+
+        char c;
+
+        if (read(STDIN_FILENO, &c, 1) > 0) {
+
+            return c == '\n';
+
+        }
+
+    }
+
+    return false;
+
+}
+
+#endif
 
 int month = 1;
 int day = 1;
@@ -85,8 +131,6 @@ int getCollegeFootballWeek(bool count_prev_bowls = false) {
     if (count_prev_bowls && seasonType == 1) {
         week = regularSeasonWeeks;
     }
-
-    printf("\nCurrent CFB Week (normalized): %i\n", week);
 
     return week;
 }
@@ -268,41 +312,71 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Weather>& weather_data1,
                   std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
-                  std::vector<RssItem>& newsItems,
                   std::string active_display) {
     printf("Updating Display!\n");
 
+#ifdef MAC_STUB_MATRIX
+    RGBMatrix::Options options;
+    options.rows = 32;
+    options.cols = 64;
+    options.chain_length = 4;
+    options.parallel = 1;
+//    options.hardware_mapping = hardware_mapping.c_str();
+    options.pwm_bits = 11; //8;
+    options.pwm_lsb_nanoseconds = 200; //180; //130;  // ✅ Fine for Pi 4 or Zero 2 W
+    options.brightness = 90; //75; //50;  // ✅ Fine for Pi 4 or Zero 2 W
+    
+    RuntimeOptions runtime_opt;
+    runtime_opt.gpio_slowdown = 5;
+
+    RGBMatrix* matrix = CreateMatrixFromOptions(options, runtime_opt);
+    FrameCanvas* canvas = matrix->CreateFrameCanvas();
+
+    // Attach Matrix and Canvas
+    display.attach(matrix, canvas);
+    weather_display.attach(matrix, canvas);
+#endif
+
     while (running) {
+#ifdef MAC_STUB_MATRIX
+	display.setCanvas(canvas);
+	weather_display.setCanvas(canvas);
+#endif
+
         if (active_display == "weather") {
             if (update_index == 0) {
-               weather_index = weather_display.render(cities[weather_index], weather_data2, weather_index, "../images/");
+               weather_index = weather_display.draw(cities[weather_index], weather_data2, weather_index, "../images/");
             } else if (update_index == 1) {
-               weather_index = weather_display.render(cities[weather_index], weather_data1, weather_index, "../images/");
+               weather_index = weather_display.draw(cities[weather_index], weather_data1, weather_index, "../images/");
             } else {
-               weather_display.render_text("Fetching Weather Data!");
+               weather_display.draw_weather_text("Fetching Weather Data!");
             }
 
             std::cout << "Updated weather index : " << weather_index << std::endl;
 
-            std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
         } else if (active_display == "countdown") {
     	    countdown_display.render(month, day, hour, minute, event_name);
-            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
+//            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
         } else if (active_display == "rankings") {
             display.render_rankings(rankings, "../images/");
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
         } else if (active_display == "sports_news") {
-
+            //TODO
         } else {
 
             if (update_index == 0 && competitions2.size() > 0) {
-    	        display.render(competitions2, "../images/");
+    	        display.draw(competitions2, "../images/");
             } else if (update_index == 1 && competitions1.size() > 0) {
-    	        display.render(competitions1, "../images/");
+    	        display.draw(competitions1, "../images/");
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+//            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
         }
+
+
+    	std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+    	//std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
     }
 
     return;
@@ -326,6 +400,8 @@ int main(int argc, char* argv[]) {
     std::string countdown_sport = "";
     std::string countdown_league = "";
     std::string countdown_team = "";
+
+    bool scrolling = false;
 
     // Parse Input Arguments
     for (int i=1; i<argc; i++) {
@@ -370,6 +446,8 @@ int main(int argc, char* argv[]) {
            sports.push_back(sport_args[flag].first);
            leagues.push_back(sport_args[flag].second);
            active_display = "sports";
+       } else if (arg == "--scrolling") {
+          scrolling = true;
        }
     }
 
@@ -379,7 +457,11 @@ int main(int argc, char* argv[]) {
 
     ESPNParser parser;   // ESPN Parser Class
     WeatherParser weather_parser;   // Parser Class
-    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings");
+#ifdef MAC_STUB_MATRIX
+    SportsDisplay display(32, 64, 4, "adafruit-hat", active_display == "sports" || active_display == "rankings", scrolling);
+#else
+    SportsDisplay display(32, 64, 5, "adafruit-hat", active_display == "sports" || active_display == "rankings", scrolling);
+#endif
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
@@ -390,7 +472,6 @@ int main(int argc, char* argv[]) {
     std::vector<Team> rankings;
     std::vector<Weather> weather_data1;
     std::vector<Weather> weather_data2;
-    std::vector<RssItem> newsItems;
 
     // Resize the Weather Data Vector
     weather_data1.resize(int(cities.size()));
@@ -435,7 +516,6 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_data1),
                               std::ref(weather_data2),
                               std::ref(cities),
-                              std::ref(newsItems),
                               active_display);
 
     // Data Loop Thread
@@ -454,13 +534,37 @@ int main(int argc, char* argv[]) {
                             std::ref(cities),
                             active_display);
 
-    std::cout << "Press Enter to stop..." << std::endl;
-    std::cin.get();  // Wait for user input
+#ifdef MAC_STUB_MATRIX
+    std::cout << "Close emulator window or press Esc to stop..." << std::endl;
 
+    while (running) {
+        rgb_matrix::EmulatorMainThreadTick();
+    
+        if (rgb_matrix::EmulatorQuitRequested()) {
+            running = false;
+            break;
+        }
+    
+        SDL_Delay(16);
+    }
+
+    if (displayThread.joinable()) {
+        displayThread.join();
+    }
+
+    if (fetchThread.joinable()) {
+        fetchThread.detach();
+    }
+    
+    // Shutdown SDL last
+    rgb_matrix::EmulatorShutdown();
+
+#else
+    std::cin.get();
     running = false;
-
     displayThread.join();
     fetchThread.join();
+#endif
 
     std::cout << "All threads stopped." << std::endl;
 

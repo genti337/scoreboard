@@ -38,7 +38,7 @@ Display::Display(int rows, int cols, int chain_length, const std::string& hardwa
 }
 
 Display::~Display() {
-    delete matrix;
+//    delete matrix;
 }
 
 void Display::loadFont(const std::string& font_path) {
@@ -104,7 +104,12 @@ void Display::center_text_vertically(const rgb_matrix::Font& font, const std::st
 
 void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
                         int x, int y, rgb_matrix::Color color) {
+
+    #ifdef MAC_STUB_MATRIX
     DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    #else
+    rgb_matrix::DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    #endif
 
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
 }
@@ -144,38 +149,47 @@ void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
 //}
 
 void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
+
     Magick::Image image;
 
     try {
-       image.read(path);
+        image.read(path);
+
     } catch (const Magick::Exception &error) {
-       std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
-       return;
+        std::cerr << "Failed to read image " << path
+
+                  << ": " << error.what() << std::endl;
+
+        return;
     }
 
     image.type(Magick::TrueColorType);
-//    image.flip();              // Optional: Flip vertically
-    image.modifyImage();       // Allow pixel access
+
+    image.modifyImage();
 
     for (size_t y = 0; y < image.rows(); ++y) {
         for (size_t x = 0; x < image.columns(); ++x) {
-            const Magick::ColorRGB color = image.pixelColor(x, y);
+            const Magick::ColorRGB color(image.pixelColor(x, y));
+            uint8_t r = static_cast<uint8_t>(color.red()   * 255);
+            uint8_t g = static_cast<uint8_t>(color.green() * 255);
+            uint8_t b = static_cast<uint8_t>(color.blue()  * 255);
+
+            // Treat black pixels as transparent / blank
+            if (r == 0 && g == 0 && b == 0) {
+                continue;
+            }
 
             int draw_x = static_cast<int>(x) + offset_x;
             int draw_y = static_cast<int>(y) + offset_y;
 
-            // Optional: skip out-of-bounds pixels
             if (draw_x >= 0 && draw_x < canvas->width() &&
                 draw_y >= 0 && draw_y < canvas->height()) {
-                canvas->SetPixel(draw_x, draw_y,
-                                 static_cast<uint8_t>(color.red() * 255),
-                                 static_cast<uint8_t>(color.green() * 255),
-                                 static_cast<uint8_t>(color.blue() * 255));
+                canvas->SetPixel(draw_x, draw_y, r, g, b);
             }
         }
     }
 
-    max_display_x = std::max(max_display_x, offset_x + int(image.columns()));
+    max_display_x = std::max(max_display_x, offset_x + static_cast<int>(image.columns()));
 }
 
 void Display::drawImageCentered(const std::string& path, int offset_x, int min_y, int max_y) {
@@ -292,3 +306,21 @@ void Display::DrawRectangleBorder(int x, int y, int width, int height, int borde
 
     max_display_x = x + width;
 }
+
+void Display::attach(rgb_matrix::RGBMatrix* shared_matrix,
+                     rgb_matrix::FrameCanvas* shared_canvas)
+{
+    matrix = shared_matrix;
+
+    canvas = shared_canvas;
+
+    return;
+}
+
+void Display::setCanvas(rgb_matrix::FrameCanvas* shared_canvas)
+{
+    canvas = shared_canvas;
+
+    return;
+}
+

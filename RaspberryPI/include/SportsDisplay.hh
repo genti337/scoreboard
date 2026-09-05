@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <chrono>
 
 #include "led-matrix.h"
 #include "graphics.h"
@@ -13,20 +14,24 @@
 
 class SportsDisplay : public Display {
 public:
-    SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active);
+    SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active, bool scrolling);
     ~SportsDisplay();
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);
     void update_x_offset(std::vector<Competition> competitions, int index);
     void update_x_offset(std::vector<Team> rankings, int index);
     std::string format_quarter_time(const std::string& shortDetail);
+    bool determinePossessionDirection(int yardLine,
+                                      const std::string& possessionText,
+                                      const std::string& possessionTeamAbbrev);
     void draw_baseball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
+    void draw_football2(Competition& competition, int x_init, const std::string& images_dir);
     void draw_touchdown(const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void render(std::vector<Competition>& competitions, const std::string& images_dir);
+    void draw(std::vector<Competition>& competitions, const std::string& images_dir);
     void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
 
 private:
@@ -53,6 +58,8 @@ private:
 
     int num_comp_display;
     int num_rank_display;
+
+    bool scroll_display;
 };
 
 #endif

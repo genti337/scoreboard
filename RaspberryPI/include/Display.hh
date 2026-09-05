@@ -34,14 +34,16 @@ public:
     rgb_matrix::Color brighterHex(const std::string& hex1, const std::string& hex2);
     void DrawRectangleBorder(int x, int y, int width, int height, int border_thickness, rgb_matrix::Color color);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
+    void attach(rgb_matrix::RGBMatrix* shared_matrix,rgb_matrix::FrameCanvas* shared_canvas);
+    void setCanvas(rgb_matrix::FrameCanvas* shared_canvas);
 
 //private:
     struct Pixel {
         uint8_t r, g, b;
     };
 
-    rgb_matrix::RGBMatrix* matrix;
-    rgb_matrix::FrameCanvas* canvas;
+    rgb_matrix::RGBMatrix* matrix = nullptr;
+    rgb_matrix::FrameCanvas* canvas = nullptr;
     rgb_matrix::Font font;
     rgb_matrix::Font small_font;
     rgb_matrix::Color textColor;

@@ -203,8 +203,8 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             ctx = "events[" + std::to_string(ei) + "].competitions[0].status.period";
             game.period = std::to_string(comp.at("status").at("period").get<int>());
 
-//FIXME            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
-//FIXME            game.clock = comp.at("status").at("displayClock").get<std::string>();
+            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
+            game.clock = comp.at("status").at("displayClock").get<std::string>();
 
             // Date/time
             ctx = "events[" + std::to_string(ei) + "].competitions[0].date";
@@ -283,6 +283,12 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     if (sit.contains("possession")) {
                         ctx += ".possession";
                         game.possession_id = sit.at("possession").get<std::string>();
+                    }
+                    // Current field position
+                    if (sit.contains("yardLine") && !sit.at("yardLine").is_null()) {
+
+                        game.yard_line = sit.at("yardLine").get<int>();
+
                     }
                 }
             }
