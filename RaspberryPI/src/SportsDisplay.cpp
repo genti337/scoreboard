@@ -650,6 +650,7 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
 
            last_index_update = std::chrono::steady_clock::now();
            competition_index[1] = (competition_index[1] + 1) % competitions.size();
+	   if (competition_index[1] == 0) competition_index[1] += 1;
 
            if (competitions[competition_index[1]].sport == "baseball") {
               draw_baseball(competitions[competition_index[1]], 0, images_dir);
