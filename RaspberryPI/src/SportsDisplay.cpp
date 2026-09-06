@@ -344,9 +344,9 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
        oss3 << images_dir << "possession_football.bmp";
        x_offset = max_display_x + 4;
        if (competition.AwayTeam.team_id == competition.possession_id) {
-          drawImage(oss3.str(), x_offset, 10);
-       } else {
           drawImage(oss3.str(), x_offset, -3);
+       } else {
+          drawImage(oss3.str(), x_offset, 10);
        }
 
        x_offset = max_display_x + 16;
@@ -385,6 +385,12 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
     int ball_width = 7;
     bool goingRight = false;
     std::string yard_text;
+
+//    competition.state = "in";
+//    competition.yard_line = 75;
+//    competition.possession_id = competition.HomeTeam.team_id;
+//    competition.possession_id = competition.AwayTeam.team_id;
+
     double ball_location = static_cast<double>(competition.yard_line);
 
     // Reset the Maximum X
@@ -419,6 +425,11 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
     // Current X-Offset
     x_offset = max_display_x + 8;
 
+    std::cout << "Possessionion ID : " << competition.possession_id << "\n";
+    std::cout << "Home Team ID : " << competition.HomeTeam.team_id << "\n";
+    std::cout << "Away Team ID : " << competition.AwayTeam.team_id << "\n";
+
+
     // Pre Game Display
     if (competition.state == "pre") {
        draw_text(font, competition.day, x_offset, 8, rgb_matrix::Color(255, 255, 255));
@@ -435,9 +446,9 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        oss3 << images_dir << "possession_football.bmp";
        x_offset = max_display_x + 4;
        if (competition.AwayTeam.team_id == competition.possession_id) {
-          drawImage(oss3.str(), x_offset, 10);
-       } else {
           drawImage(oss3.str(), x_offset, -3);
+       } else {
+          drawImage(oss3.str(), x_offset, 10);
        }
 
        // Draw the Football Field
@@ -455,11 +466,15 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
                    rgb_matrix::Color(255, 255, 255));
 
        center_text(game_font,
-                   competition.possession_text,
+                   competition.down_dist,
                    x_offset,
                    max_display_x,
                    15,
                    rgb_matrix::Color(255, 255, 255));
+
+       if (competition.possession_text == competition.AwayTeam.team_id) {
+          competition.yard_line = (100 - competition.yard_line);
+       }
 
        if (competition.yard_line <= 50) {
           yard_text = std::to_string(competition.yard_line); 
@@ -485,22 +500,24 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        }
 
        // Determine what direction the posessing team is driving
+       goingRight = (competition.AwayTeam.team_id == competition.possession_id);
+       std::cout << "Possessionion ID : " << competition.possession_id << "\n";
+       std::cout << "Home Team ID : " << competition.HomeTeam.team_id << "\n";
+       std::cout << "Away Team ID : " << competition.AwayTeam.team_id << "\n";
        if (competition.AwayTeam.team_id == competition.possession_id) {
-          goingRight = determinePossessionDirection(competition.yard_line, competition.possession_text, competition.AwayTeam.abbr);
-       } else {
-          goingRight = determinePossessionDirection(competition.yard_line, competition.possession_text, competition.HomeTeam.abbr);
-       }
-
-       if (goingRight) {
            drawImage("../images/arrow_right.bmp", x_offset + endzone_offset + (ball_width / 2) + 3 + std::round((ball_location / 100) * field_width), 23);
        } else {
            drawImage("../images/arrow_left.bmp", x_offset + endzone_offset - ball_width - 1 + std::round((ball_location / 100) * field_width), 23);
        }
 
        // End zone colors
-       rgb_matrix::Color endzone =
+       rgb_matrix::Color home_endzone =
            brighterHex(competition.HomeTeam.color,
                        competition.HomeTeam.alt_color);
+       rgb_matrix::Color away_endzone =
+           brighterHex(competition.AwayTeam.color,
+                       competition.AwayTeam.alt_color);
+
        
        // Coordinates within football_field2.bmp
        const int left_endzone_x  = 6;
@@ -517,9 +534,9 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
                 x < x_offset + left_endzone_x + endzone_width;
                 ++x) {
                canvas->SetPixel(x, y,
-                                endzone.r,
-                                endzone.g,
-                                endzone.b);
+                                away_endzone.r,
+                                away_endzone.g,
+                                away_endzone.b);
            }
        }
        
@@ -529,9 +546,9 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
                 x < x_offset + right_endzone_x + endzone_width;
                 ++x) {
                canvas->SetPixel(x, y,
-                                endzone.r,
-                                endzone.g,
-                                endzone.b);
+                                home_endzone.r,
+                                home_endzone.g,
+                                home_endzone.b);
            }
        }
 
