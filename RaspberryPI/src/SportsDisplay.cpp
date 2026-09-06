@@ -391,6 +391,10 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 //    competition.possession_id = competition.HomeTeam.team_id;
 //    competition.possession_id = competition.AwayTeam.team_id;
 
+    // Set the Ball Location
+    if (competition.possession_id == competition.HomeTeam.team_id) {
+       competition.yard_line = (100 - competition.yard_line);
+    }
     double ball_location = static_cast<double>(competition.yard_line);
 
     // Reset the Maximum X
@@ -471,10 +475,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
                    max_display_x,
                    15,
                    rgb_matrix::Color(255, 255, 255));
-
-       if (competition.possession_text == competition.AwayTeam.team_id) {
-          competition.yard_line = (100 - competition.yard_line);
-       }
 
        if (competition.yard_line <= 50) {
           yard_text = std::to_string(competition.yard_line); 

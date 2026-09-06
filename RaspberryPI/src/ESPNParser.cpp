@@ -203,8 +203,8 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             ctx = "events[" + std::to_string(ei) + "].competitions[0].status.period";
             game.period = std::to_string(comp.at("status").at("period").get<int>());
 
-            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
-            game.clock = comp.at("status").at("displayClock").get<std::string>();
+//FIXME            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
+//FIXME            game.clock = comp.at("status").at("displayClock").get<std::string>();
 
             // Date/time
             ctx = "events[" + std::to_string(ei) + "].competitions[0].date";
@@ -241,6 +241,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 }
 
                 if (is_home) {
+                    game.HomeTeam.team_id = teamObj.at("id").get<std::string>();
                     game.HomeTeam.abbr = teamObj.at("abbreviation").get<std::string>();
                     game.HomeTeam.score = team.value("score", "0"); // score can be missing pregame
                     game.HomeTeam.record = getTeamRecord(team);
@@ -249,6 +250,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     game.HomeTeam.alt_color = get_color("alternateColor", "000000");
                     game.HomeTeam.conference_id = conference_id;
                 } else {
+                    game.AwayTeam.team_id = teamObj.at("id").get<std::string>();
                     game.AwayTeam.abbr = teamObj.at("abbreviation").get<std::string>();
                     game.AwayTeam.score = team.value("score", "0");
                     game.AwayTeam.record = getTeamRecord(team);
@@ -283,12 +285,6 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     if (sit.contains("possession")) {
                         ctx += ".possession";
                         game.possession_id = sit.at("possession").get<std::string>();
-                    }
-                    // Current field position
-                    if (sit.contains("yardLine") && !sit.at("yardLine").is_null()) {
-
-                        game.yard_line = sit.at("yardLine").get<int>();
-
                     }
                 }
             }
