@@ -2,6 +2,7 @@
 #include "../include/SportsDisplay.hh"
 #include "../include/ScrollClock.hh"
 #include "../include/ESPNParser.hh"
+#include "../include/FootballField.hh"
 #include <cassert>
 #include <cstdio>
 #include <iostream>
@@ -77,6 +78,10 @@ int main() {
         std::string error;
         assert(parser.parseESPNScoreboard(payload.dump(), parsed, "football", "nfl", {}, &error));
         assert(parsed.size() == 2 && parsed.back().clock == (halftime ? "Half" : "5:34"));
+        const auto line = situation.is_object() ? situation.find("yardLine") : situation.end();
+        if (line != situation.end() && line->is_number_integer() && *line >= 0 && *line <= 100)
+            assert(parsed.back().yard_line == line->get<int>());
+        else assert(parsed.back().yard_line == -1);
         return parsed.back().down_dist;
     };
     assert(parse_down({{"shortDownDistanceText", " 3rd & 8 "}, {"downDistanceText", "other"}}) == "3rd & 8");
@@ -107,6 +112,28 @@ int main() {
     assert(parse_down({{"shortDownDistanceText", "--"}}) == "");
     assert(parse_down({{"shortDownDistanceText", "--"}, {"down", 3}, {"distance", 8}}) == "3rd & 8");
     assert(parse_down({{"shortDownDistanceText", "2nd & 5"}}, false, false, "Kickoff") == "2nd & 5");
+    for (const json& line : {json(0), json(35), json(65), json(100), json(-1), json(101), json(nullptr), json("35")})
+        parse_down({{"yardLine", line}});
+    auto field_game = fixture("football", "in");
+    for (const std::string& owner : {field_game.AwayTeam.team_id, field_game.HomeTeam.team_id}) {
+        field_game.possession_id = owner;
+        for (int line : {0, 25, 50, 65, 100}) {
+            field_game.yard_line = line;
+            const auto p = footballFieldPosition(field_game);
+            assert(p.valid && p.yards_from_left == 100 - line);
+            assert(p.away_possession == (owner == field_game.AwayTeam.team_id));
+        }
+        field_game.yard_line = -1;
+        for (const auto& entry : std::vector<std::pair<std::string, int>>{{"AWY 25",25},{"HOM 25",75},{"50",50}}) {
+            field_game.possession_text = entry.first;
+            assert(footballFieldPosition(field_game).yards_from_left == entry.second);
+            assert(footballFieldPosition(field_game).valid);
+        }
+        field_game.possession_text = "UNKNOWN 25";
+        assert(!footballFieldPosition(field_game).valid);
+    }
+    field_game.possession_id.clear(); field_game.yard_line = 50;
+    assert(!footballFieldPosition(field_game).valid);
     const auto start = ScrollClock::Clock::time_point{};
     ScrollClock regular(20, start), irregular(20, start), fractional(12.5, start);
     int regular_pixels = 0, irregular_pixels = 0, fractional_pixels = 0;
@@ -137,6 +164,13 @@ int main() {
     for (const std::string name : {"test/HOM", "test/AWY", "base_loaded", "base_empty",
                                   "no_outs", "outs", "arrow", "possession_football", "cache"})
         image.write(assets + name + ".bmp");
+    Magick::Image field_image(Magick::Geometry(130, 24), Magick::Color("black"));
+    field_image.write(assets + "football_field.bmp");
+    Magick::Image ball_image(Magick::Geometry(8, 5), Magick::Color("magenta"));
+    ball_image.write(assets + "football_small.bmp");
+    Magick::Image arrow_image(Magick::Geometry(2, 2), Magick::Color("green"));
+    arrow_image.write(assets + "arrow_right.bmp");
+    arrow_image.write(assets + "arrow_left.bmp");
     for (const std::string sport : {"football", "basketball", "baseball"}) {
         for (const std::string state : {"pre", "in", "post"}) {
             SportsDisplay cached(32, 64, 4, "regular", true, true);
@@ -218,6 +252,28 @@ int main() {
         (display.*draw)(halftime, 0, assets);
         assert(halftime_pixels == display.canvas->pixels());
     }
+    for (const std::string& owner : {field_game.AwayTeam.team_id, field_game.HomeTeam.team_id}) {
+        field_game.possession_id = owner;
+        for (int line : {0, 25, 50, 65, 100}) {
+            field_game.yard_line = line;
+            display.canvas->Clear();
+            display.draw_football2(field_game, 0, assets);
+            const int field_left = field_game.game_display_width - 130;
+            const int ball_left = field_left + 12 + static_cast<int>(std::round((100 - line) * 105 / 100.0)) - 4;
+            for (int y = 23; y < 28; ++y)
+                for (int x = ball_left; x < ball_left + 8; ++x) {
+                    const auto pixel = (y * 256 + x) * 3;
+                    assert(display.canvas->pixels()[pixel] == 255);
+                    assert(display.canvas->pixels()[pixel + 1] == 0);
+                    assert(display.canvas->pixels()[pixel + 2] == 255);
+                }
+        }
+    }
+    field_game.possession_id.clear();
+    display.canvas->Clear();
+    display.draw_football2(field_game, 0, assets);
+    for (size_t i = 0; i < display.canvas->pixels().size(); i += 3)
+        assert(!(display.canvas->pixels()[i] == 255 && display.canvas->pixels()[i+1] == 0 && display.canvas->pixels()[i+2] == 255));
     SportsDisplay live(32, 64, 4, "regular", true, false);
     std::vector<Competition> live_game{fixture("football", "in")};
     live_game[0].HomeTeam.team_id = live_game[0].possession_id;

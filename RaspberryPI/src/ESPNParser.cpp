@@ -352,6 +352,10 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     }
                     game.possession_text = optionalText(sit, "possessionText");
                     game.possession_id = optionalText(sit, "possession");
+                    const auto yard_line = sit.find("yardLine");
+                    if (yard_line != sit.end() && yard_line->is_number_integer()
+                        && *yard_line >= 0 && *yard_line <= 100)
+                        game.yard_line = yard_line->get<int>();
                 }
             }
 

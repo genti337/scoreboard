@@ -35,69 +35,6 @@ std::string event_name = "";
 // C++17-safe alias for days
 using days = std::chrono::duration<long long, std::ratio<86400>>;
 
-// Returns number of weeks in College Football Season
-int getCollegeFootballRegularSeasonWeeks() {
-    std::ostringstream url;
-    url << "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
-
-    FetchData fetcher(url.str());
-    std::string data = fetcher.fetch();
-
-    nlohmann::json j = nlohmann::json::parse(data);
-
-    if (!j.contains("week") || !j["week"].contains("number")) {
-        return 0;  // preseason or malformed response
-    }
-
-    // -------------------------------------------------
-    // Determine regular season length dynamically
-    // -------------------------------------------------
-    int regularSeasonWeeks = j["leagues"][0]["calendar"][0]["entries"].size();
-
-    return regularSeasonWeeks;
-}
-
-// Returns current CFB week (1-based).
-// Before the season starts: returns 0 (preseason).
-// During postseason, returns week offset beyond regular season.
-int getCollegeFootballWeek(bool count_prev_bowls = false) {
-    std::ostringstream url;
-    url << "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
-
-    FetchData fetcher(url.str());
-    std::string data = fetcher.fetch();
-
-    nlohmann::json j = nlohmann::json::parse(data);
-
-    int week = 0;
-
-    if (!j.contains("week") || !j["week"].contains("number")) {
-        return 0;  // preseason or malformed response
-    }
-
-    // -------------------------------------------------
-    // Determine regular season length dynamically
-    // -------------------------------------------------
-    int regularSeasonWeeks = j["leagues"][0]["calendar"][0]["entries"].size();
-
-    week = j["week"]["number"].get<int>();
-
-    // ESPN season type:
-    // 1 = preseason, 2 = regular, 3 = postseason
-    int seasonType = j["season"]["type"].get<int>();
-
-    if (seasonType == 3) {  // Postseason
-        week += regularSeasonWeeks;
-    }
-
-    // Optional: early January bowl handling
-    if (count_prev_bowls && seasonType == 1) {
-        week = regularSeasonWeeks;
-    }
-
-    return week;
-}
-
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
@@ -210,14 +147,31 @@ void fetch_loop(std::atomic<bool>& running,
             for (int i=0; i<int(sports.size()); i++) {
                std::ostringstream url;
 
-               if (leagues[i] == "college-football" 
-               && (getCollegeFootballWeek() <= getCollegeFootballRegularSeasonWeeks())) {
-                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] 
-                      << "/" << leagues[i] << "/scoreboard?year=2025&week=" << getCollegeFootballWeek() 
-                      << "&seasontype=2&groups=80&limit=500";
-               } else {
-                  url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i] << "/" << leagues[i] << "/scoreboard";
+               url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i]
+                   << "/" << leagues[i] << "/scoreboard";
+               if (leagues[i] == "college-football") {
+                   // Read the season and week together. The season year can
+                   // differ from the calendar year during January bowl games.
+                   FetchData current_season(url.str());
+                   const auto metadata = json::parse(current_season.fetch(), nullptr, false);
+                   if (metadata.is_object() && metadata.contains("season") && metadata["season"].is_object()
+                       && metadata.contains("week") && metadata["week"].is_object()) {
+                       const auto& season = metadata["season"];
+                       const auto& week = metadata["week"];
+                       if (season.contains("type") && season["type"] == 2
+                           && season.contains("year") && season["year"].is_number_integer()
+                           && week.contains("number") && week["number"].is_number_integer()
+                           && season["year"] > 0 && season["year"] <= 9999
+                           && week["number"] > 0 && week["number"] <= 100) {
+                           url << "?year=" << season["year"].get<int>()
+                               << "&week=" << week["number"].get<int>()
+                               << "&seasontype=2&groups=80&limit=500";
+                       }
+                   }
+                   // Postseason or unavailable metadata uses the current feed
+                   // without forcing a regular-season year or week.
                }
+
 	       std::cout << url.str() << std::endl;
                FetchData fetcher(url.str());
                std::string data = fetcher.fetch();
@@ -272,7 +226,7 @@ void display_loop(std::atomic<bool>& running,
     RGBMatrix::Options options;
     options.rows = 32;
     options.cols = 64;
-    options.chain_length = 4;
+    options.chain_length = 5;
     options.parallel = 1;
 //    options.hardware_mapping = hardware_mapping.c_str();
     options.pwm_bits = 11; //8;

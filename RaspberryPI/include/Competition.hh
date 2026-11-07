@@ -25,7 +25,7 @@ public:
     std::string down_dist;      //
     std::string possession_text;   //
     std::string possession_id;		// Posession Team ID
-    int yard_line = 50;		// Posession Team ID
+    int yard_line = -1;        // ESPN coordinate from home goal; -1 means unavailable
 
     Team HomeTeam;
     Team AwayTeam;

@@ -21,3 +21,5 @@ Live games are polled every 10 seconds; other scoreboards every 60 seconds. The 
 Football down and distance prefers `shortDownDistanceText`, then `downDistanceText`, then valid numeric `down` and `distance` values (or an explicit `isGoalToGo` flag). Unavailable values leave the line blank, or show a short label when the current status explicitly identifies halftime (`Half`), kickoff, PAT, a two-point attempt (`2pt`), delay, suspension, or a quarter break. Last-play data is not treated as the current situation. Previous down-and-distance values are never retained.
 
 At halftime, both football layouts replace the quarter, clock, and situation area with a single vertically centered `Halftime` label. Team information and scores remain visible.
+
+The non-scrolling football field keeps the away end zone on the left and home end zone on the right. The football follows ESPN's reported yard line; the direction arrow points right for away possession and left for home possession. An explicit possession-text yard line is used if the numeric position is unavailable. Unknown possession or field position hides the ball rather than placing it at midfield.
