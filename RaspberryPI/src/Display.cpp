@@ -69,7 +69,7 @@ void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
                           int red, int green, int blue) {
     int text_width = getTextWidth(font, text);
     int x = min_x + (max_x - min_x - text_width) / 2;
-    DrawText(canvas, font, x, y, rgb_matrix::Color(red, green, blue), nullptr, text.c_str());
+    DrawText(target(), font, x, y, rgb_matrix::Color(red, green, blue), nullptr, text.c_str());
 
     max_display_x = std::max(max_display_x, max_x);
 }
@@ -79,7 +79,7 @@ void Display::center_text(const rgb_matrix::Font& font, const std::string& text,
                           rgb_matrix::Color color) {
     int text_width = getTextWidth(font, text);
     int x = min_x + (max_x - min_x - text_width) / 2;
-    DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    DrawText(target(), font, x, y, color, nullptr, text.c_str());
 
     max_display_x = std::max(max_display_x, max_x);
 }
@@ -97,7 +97,7 @@ void Display::center_text_vertically(const rgb_matrix::Font& font, const std::st
     int y = min_y + (max_y - min_y - text_height) / 2 + text_height; 
     // Adding text_height because DrawText y is typically baseline, not top
 
-    DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    DrawText(target(), font, x, y, color, nullptr, text.c_str());
 
     max_display_x = std::max(max_display_x, max_x);
 }
@@ -106,9 +106,9 @@ void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
                         int x, int y, rgb_matrix::Color color) {
 
     #ifdef MAC_STUB_MATRIX
-    DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    DrawText(target(), font, x, y, color, nullptr, text.c_str());
     #else
-    rgb_matrix::DrawText(canvas, font, x, y, color, nullptr, text.c_str());
+    rgb_matrix::DrawText(target(), font, x, y, color, nullptr, text.c_str());
     #endif
 
     max_display_x = std::max(max_display_x, x + getTextWidth(font, text));
@@ -148,92 +148,64 @@ void Display::draw_text(const rgb_matrix::Font& font, const std::string& text,
 //    }
 //}
 
-void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
-
-    Magick::Image image;
-
+const Display::Bitmap& Display::cachedImage(const std::string& path) {
+    auto found = image_cache.find(path);
+    if (found != image_cache.end()) return found->second;
+    Bitmap bitmap;
     try {
+        Magick::Image image;
         image.read(path);
-
-    } catch (const Magick::Exception &error) {
-        std::cerr << "Failed to read image " << path
-
-                  << ": " << error.what() << std::endl;
-
-        return;
-    }
-
-    image.type(Magick::TrueColorType);
-
-    image.modifyImage();
-
-    for (size_t y = 0; y < image.rows(); ++y) {
-        for (size_t x = 0; x < image.columns(); ++x) {
-            const Magick::ColorRGB color(image.pixelColor(x, y));
-            uint8_t r = static_cast<uint8_t>(color.red()   * 255);
-            uint8_t g = static_cast<uint8_t>(color.green() * 255);
-            uint8_t b = static_cast<uint8_t>(color.blue()  * 255);
-
-            // Treat black pixels as transparent / blank
-            if (r == 0 && g == 0 && b == 0) {
-                continue;
-            }
-
-            int draw_x = static_cast<int>(x) + offset_x;
-            int draw_y = static_cast<int>(y) + offset_y;
-
-            if (draw_x >= 0 && draw_x < canvas->width() &&
-                draw_y >= 0 && draw_y < canvas->height()) {
-                canvas->SetPixel(draw_x, draw_y, r, g, b);
+        image.type(Magick::TrueColorType);
+        bitmap.width = static_cast<int>(image.columns());
+        bitmap.height = static_cast<int>(image.rows());
+        bitmap.pixels.reserve(bitmap.width * bitmap.height);
+        for (int y = 0; y < bitmap.height; ++y) {
+            for (int x = 0; x < bitmap.width; ++x) {
+                const Magick::ColorRGB color(image.pixelColor(x, y));
+                bitmap.pixels.push_back({static_cast<uint8_t>(color.red() * 255),
+                                         static_cast<uint8_t>(color.green() * 255),
+                                         static_cast<uint8_t>(color.blue() * 255)});
             }
         }
+    } catch (const Magick::Exception& error) {
+        std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
+        bitmap = Bitmap{};
     }
+    // Remember failures too, avoiding repeated disk access and logging per frame.
+    return image_cache.emplace(path, std::move(bitmap)).first->second;
+}
 
-    max_display_x = std::max(max_display_x, offset_x + static_cast<int>(image.columns()));
+void Display::drawImage(const std::string& path, int offset_x, int offset_y) {
+    const auto& image = cachedImage(path);
+    auto* out = target();
+    max_display_x = std::max(max_display_x, offset_x + image.width);
+    const int left = std::max(0, -offset_x);
+    const int right = std::min(image.width, out->width() - offset_x);
+    const int top = std::max(0, -offset_y);
+    const int bottom = std::min(image.height, out->height() - offset_y);
+    for (int y = top; y < bottom; ++y) {
+        for (int x = left; x < right; ++x) {
+            const auto& p = image.pixels[y * image.width + x];
+            if (p.r || p.g || p.b) out->SetPixel(x + offset_x, y + offset_y, p.r, p.g, p.b);
+        }
+    }
 }
 
 void Display::drawImageCentered(const std::string& path, int offset_x, int min_y, int max_y) {
-    Magick::Image image;
-
-    try {
-        image.read(path);
-    } catch (const Magick::Exception &error) {
-        std::cerr << "Failed to read image " << path << ": " << error.what() << std::endl;
-        return;
-    }
-
-    image.type(Magick::TrueColorType);
-    image.modifyImage(); // Allow pixel access
-
-    // Calculate vertical center between min_y and max_y
-    int range_height = max_y - min_y + 1;
-    int img_height = static_cast<int>(image.rows());
-    int offset_y = min_y + (range_height - img_height) / 2;
-
-    // Clamp offset_y if image taller than range
-    if (img_height > range_height) {
-        offset_y = min_y; // Top-align if too tall
-    }
-
-    for (size_t y = 0; y < image.rows(); ++y) {
-        for (size_t x = 0; x < image.columns(); ++x) {
-            const Magick::ColorRGB color = image.pixelColor(x, y);
-
-            int draw_x = static_cast<int>(x) + offset_x;
-            int draw_y = static_cast<int>(y) + offset_y;
-
-            if (draw_x >= 0 && draw_x < canvas->width() &&
-                draw_y >= min_y && draw_y <= max_y &&
-                draw_y >= 0 && draw_y < canvas->height()) {
-                canvas->SetPixel(draw_x, draw_y,
-                                 static_cast<uint8_t>(color.red() * 255),
-                                 static_cast<uint8_t>(color.green() * 255),
-                                 static_cast<uint8_t>(color.blue() * 255));
-            }
+    const auto& image = cachedImage(path);
+    auto* out = target();
+    const int offset_y = min_y + std::max(0, (max_y - min_y + 1 - image.height) / 2);
+    max_display_x = std::max(max_display_x, offset_x + image.width);
+    const int left = std::max(0, -offset_x);
+    const int right = std::min(image.width, out->width() - offset_x);
+    const int top = std::max({0, -offset_y, min_y - offset_y});
+    const int bottom = std::min({image.height, out->height() - offset_y, max_y + 1 - offset_y});
+    for (int y = top; y < bottom; ++y) {
+        for (int x = left; x < right; ++x) {
+            const auto& p = image.pixels[y * image.width + x];
+            out->SetPixel(x + offset_x, y + offset_y, p.r, p.g, p.b);
         }
     }
-
-    max_display_x = std::max(max_display_x, offset_x + int(image.columns()));
 }
 
 rgb_matrix::Color Display::colorFromHex(const std::string& hex) {

@@ -18,8 +18,8 @@ public:
     ~SportsDisplay();
 
     void set_sport(const std::string& ext_sport, const std::string& ext_league);
-    void update_x_offset(std::vector<Competition> competitions, int index);
-    void update_x_offset(std::vector<Team> rankings, int index);
+    void update_x_offset(const std::vector<Competition>& competitions, int index);
+    void update_x_offset(const std::vector<Team>& rankings, int index);
     std::string format_quarter_time(const std::string& shortDetail);
     bool determinePossessionDirection(int yardLine,
                                       const std::string& possessionText,
@@ -32,9 +32,17 @@ public:
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     void draw(std::vector<Competition>& competitions, const std::string& images_dir);
+    void invalidateCards(bool reset_layout = false);
     void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
 
 private:
+    struct Card {
+        int width = 0;
+        std::vector<Display::Pixel> pixels;
+    };
+    std::map<int, Card> competition_cards;
+    std::map<int, Card> ranking_cards;
+    void drawCard(const Card& card, int x);
     struct Pixel {
         uint8_t r, g, b;
     };

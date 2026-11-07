@@ -48,7 +48,17 @@ private:
     std::map<int, Glyph> glyphs_;
 };
 
-class FrameCanvas {
+class Canvas {
+public:
+    virtual ~Canvas() = default;
+    virtual int width() const = 0;
+    virtual int height() const = 0;
+    virtual void Clear() = 0;
+    virtual void Fill(uint8_t r, uint8_t g, uint8_t b) = 0;
+    virtual void SetPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) = 0;
+};
+
+class FrameCanvas : public Canvas {
 public:
     FrameCanvas(int w, int h)
         : w_(w), h_(h), pixels_(w * h * 3, 0) {}

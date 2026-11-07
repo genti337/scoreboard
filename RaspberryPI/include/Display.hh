@@ -4,6 +4,8 @@
 #include <string>
 #include <sstream>
 #include <map>
+#include <vector>
+#include <unordered_map>
 
 #include "led-matrix.h"
 #include "graphics.h"
@@ -50,7 +52,16 @@ public:
     rgb_matrix::Color bg_color;
     std::string currentText;
 
-    int max_display_x;
+    struct Bitmap {
+        int width = 0, height = 0;
+        std::vector<Pixel> pixels;
+    };
+    const Bitmap& cachedImage(const std::string& path);
+    rgb_matrix::Canvas* render_target = nullptr;
+    rgb_matrix::Canvas* target() { return render_target ? render_target : canvas; }
+    std::unordered_map<std::string, Bitmap> image_cache;
+
+    int max_display_x = 0;
     int display_width;
 
     bool first_pass;

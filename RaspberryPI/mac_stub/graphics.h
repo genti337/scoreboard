@@ -95,7 +95,7 @@ inline int Font::CharacterWidth(char c) const {
 }
 
 inline int DrawText(
-    FrameCanvas* canvas,
+    Canvas* canvas,
     const Font& font,
     int x,
     int baseline_y,

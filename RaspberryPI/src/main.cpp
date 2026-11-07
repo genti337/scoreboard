@@ -10,6 +10,8 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <ctime>
@@ -186,14 +188,16 @@ bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
     return true;
 }
 
+struct DisplayData {
+    std::mutex mutex;
+    std::shared_ptr<const std::vector<Competition>> competitions;
+    std::shared_ptr<const std::vector<Weather>> weather;
+};
+
 void fetch_loop(std::atomic<bool>& running, 
                 ESPNParser& parser, 
                 WeatherParser& weather_parser, 
-                int& update_index,
-                std::vector<Competition>& competitions1,
-                std::vector<Competition>& competitions2,
-                std::vector<Weather>& weather_data1,
-                std::vector<Weather>& weather_data2,
+                DisplayData& shared_data,
                 std::vector<std::string>& sports,
                 std::vector<std::string>& conferences,
                 std::vector<std::string>& leagues,
@@ -208,6 +212,7 @@ void fetch_loop(std::atomic<bool>& running,
         //std::cout << "Cities : " << cities[0] << std::endl;
 
         if (active_display == "weather") {
+            auto next_weather = std::make_shared<std::vector<Weather>>(cities.size());
 	    for (int i=0; i<int(cities.size()); i++) {
                 double lat, lon;
                 //getCoordinatesFromCity(cities[i], lat, lon);
@@ -222,18 +227,12 @@ void fetch_loop(std::atomic<bool>& running,
                 FetchData fetcher(url.str());
                 std::string data = fetcher.fetch();
 
-                if (update_index < 0) {
-                   weather_parser.parseWeather(data, std::ref(weather_data1[i]));
-                   weather_parser.parseWeather(data, std::ref(weather_data2[i]));
-                } else if (update_index == 0) {
-                   weather_parser.parseWeather(data, std::ref(weather_data1[i]));
-                } else {
-                   weather_parser.parseWeather(data, std::ref(weather_data2[i]));
-                }
+                weather_parser.parseWeather(data, (*next_weather)[i]);
             }
-
-            // Increment the Index
-            update_index = (update_index + 1) % 2;
+            {
+                std::lock_guard<std::mutex> lock(shared_data.mutex);
+                shared_data.weather = std::move(next_weather);
+            }
 
             std::cout << "Finished fetching data!" << std::endl;
 
@@ -242,6 +241,8 @@ void fetch_loop(std::atomic<bool>& running,
 
         } else if (active_display == "sports") {
 
+            auto next_competitions = std::make_shared<std::vector<Competition>>();
+            bool complete = true;
             std::cout << "Fetching Sports Data: ";
 
             // Loop through Sports
@@ -264,29 +265,17 @@ void fetch_loop(std::atomic<bool>& running,
 	       std::cout << "URL: " << url.str() << std::endl;
    
                if (!data.empty()) {
-                   if (update_index <= 0) {
-                       if (i == 0) {
-                          competitions1.clear();
-                       }
-                       parser.parseESPNScoreboard(data, std::ref(competitions1), sports[i], leagues[i], std::ref(conferences), &err);
-                   } else {
-                       if (i == 0) {
-                          competitions2.clear();
-                       }
-                       parser.parseESPNScoreboard(data, std::ref(competitions2), sports[i], leagues[i], std::ref(conferences), &err);
+                   if (!parser.parseESPNScoreboard(data, *next_competitions, sports[i], leagues[i], conferences, &err)) {
+                       complete = false;
                    }
-   
-                   std::cout << "Length of competitions: " << competitions1.size() << std::endl;
-   
                } else {
+                   complete = false;
                    std::cerr << "No data received.\n";
                }
             }
-
-	    if (update_index <= 0) {
-	       update_index = 1;
-            } else {
-	       update_index = 0;
+            if (complete) {
+                std::lock_guard<std::mutex> lock(shared_data.mutex);
+                shared_data.competitions = std::move(next_competitions);
             }
 
             std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
@@ -304,13 +293,9 @@ void display_loop(std::atomic<bool>& running,
                   SportsDisplay& display,
                   WeatherDisplay& weather_display,
                   CountdownDisplay& countdown_display,
-                  int& update_index,
+                  DisplayData& shared_data,
                   int& weather_index,
-                  std::vector<Competition>& competitions1,
-                  std::vector<Competition>& competitions2,
                   std::vector<Team>& rankings,
-                  std::vector<Weather>& weather_data1,
-                  std::vector<Weather>& weather_data2,
                   std::vector<std::string>& cities,
                   std::string active_display) {
     printf("Updating Display!\n");
@@ -337,24 +322,41 @@ void display_loop(std::atomic<bool>& running,
     weather_display.attach(matrix, canvas);
 #endif
 
+    auto next_frame = std::chrono::steady_clock::now();
+    std::shared_ptr<const std::vector<Competition>> previous_competitions;
+    std::shared_ptr<const std::vector<Weather>> previous_weather;
+    std::vector<Competition> competitions;
+    std::vector<Weather> weather_data;
     while (running) {
 #ifdef MAC_STUB_MATRIX
 	display.setCanvas(canvas);
 	weather_display.setCanvas(canvas);
 #endif
 
+        std::shared_ptr<const std::vector<Competition>> scores;
+        std::shared_ptr<const std::vector<Weather>> forecast;
+        {
+            std::lock_guard<std::mutex> lock(shared_data.mutex);
+            scores = shared_data.competitions;
+            forecast = shared_data.weather;
+        }
+        if (scores != previous_competitions) {
+            const bool reset_layout = !previous_competitions ||
+                !scores || competitions.size() != scores->size();
+            competitions = scores ? *scores : std::vector<Competition>{};
+            previous_competitions = scores;
+            display.invalidateCards(reset_layout);
+        }
+        if (forecast != previous_weather) {
+            weather_data = forecast ? *forecast : std::vector<Weather>{};
+            previous_weather = forecast;
+        }
         if (active_display == "weather") {
-            if (update_index == 0) {
-               weather_index = weather_display.draw(cities[weather_index], weather_data2, weather_index, "../images/");
-            } else if (update_index == 1) {
-               weather_index = weather_display.draw(cities[weather_index], weather_data1, weather_index, "../images/");
+            if (!weather_data.empty()) {
+                weather_index = weather_display.draw(cities[weather_index], weather_data, weather_index, "../images/");
             } else {
-               weather_display.draw_weather_text("Fetching Weather Data!");
+                weather_display.draw_weather_text("Fetching Weather Data!");
             }
-
-            std::cout << "Updated weather index : " << weather_index << std::endl;
-
-//            std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
         } else if (active_display == "countdown") {
     	    countdown_display.render(month, day, hour, minute, event_name);
 //            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
@@ -365,18 +367,15 @@ void display_loop(std::atomic<bool>& running,
             //TODO
         } else {
 
-            if (update_index == 0 && competitions2.size() > 0) {
-    	        display.draw(competitions2, "../images/");
-            } else if (update_index == 1 && competitions1.size() > 0) {
-    	        display.draw(competitions1, "../images/");
-            }
-
-//            std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
+            if (!competitions.empty()) display.draw(competitions, "../images/");
         }
 
+        // Rendering and VSync waiting count toward the 25 ms frame budget.
+        next_frame += std::chrono::milliseconds(25);
+        const auto now = std::chrono::steady_clock::now();
+        if (next_frame < now) next_frame = now;
+        std::this_thread::sleep_until(next_frame);
 
-    	std::this_thread::sleep_for(std::chrono::milliseconds(25));  // Fast update
-    	//std::this_thread::sleep_for(std::chrono::seconds(10));  // Fast update
     }
 
     return;
@@ -465,17 +464,10 @@ int main(int argc, char* argv[]) {
     WeatherDisplay weather_display(32, 64, 5, "adafruit-hat", active_display == "weather");
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
-    int update_index = -1;
+    DisplayData shared_data;
     int weather_index = 0;
-    std::vector<Competition> competitions1;
-    std::vector<Competition> competitions2;
     std::vector<Team> rankings;
-    std::vector<Weather> weather_data1;
-    std::vector<Weather> weather_data2;
 
-    // Resize the Weather Data Vector
-    weather_data1.resize(int(cities.size()));
-    weather_data2.resize(int(cities.size()));
 
     std::atomic<bool> running(true);
 
@@ -508,13 +500,9 @@ int main(int argc, char* argv[]) {
                               std::ref(display),
                               std::ref(weather_display),
                               std::ref(countdown_display),
-                              std::ref(update_index),
+                              std::ref(shared_data),
                               std::ref(weather_index),
-                              std::ref(competitions1),
-                              std::ref(competitions2),
                               std::ref(rankings),
-                              std::ref(weather_data1),
-                              std::ref(weather_data2),
                               std::ref(cities),
                               active_display);
 
@@ -523,11 +511,7 @@ int main(int argc, char* argv[]) {
                             std::ref(running),
                             std::ref(parser),
                             std::ref(weather_parser),
-                            std::ref(update_index),
-                            std::ref(competitions1),
-                            std::ref(competitions2),
-                            std::ref(weather_data1),
-                            std::ref(weather_data2),
+                            std::ref(shared_data),
                             std::ref(sports), 
                             std::ref(conferences), 
                             std::ref(leagues),
