@@ -1,9 +1,11 @@
 // Headless regression checks for the Mac matrix stub. Run from RaspberryPI/.
 #include "../include/SportsDisplay.hh"
+#include "../include/ScrollClock.hh"
 #include <cassert>
 #include <cstdio>
 #include <iostream>
 #include <filesystem>
+#include <limits>
 
 std::string assets;
 
@@ -36,6 +38,25 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 }
 
 int main() {
+    const auto start = ScrollClock::Clock::time_point{};
+    ScrollClock regular(20, start), irregular(20, start), fractional(12.5, start);
+    int regular_pixels = 0, irregular_pixels = 0, fractional_pixels = 0;
+    for (int ms = 25; ms <= 1000; ms += 25) {
+        regular_pixels += regular.advance(start + std::chrono::milliseconds(ms));
+        fractional_pixels += fractional.advance(start + std::chrono::milliseconds(ms));
+    }
+    for (int ms : {10, 80, 220, 240, 400, 610, 800, 1000})
+        irregular_pixels += irregular.advance(start + std::chrono::milliseconds(ms));
+    assert(regular_pixels == 20 && irregular_pixels == 20 && fractional_pixels == 12);
+    assert(fractional.advance(start + std::chrono::milliseconds(1040)) == 1);
+    ScrollClock paused(20, start);
+    assert(paused.advance(start + std::chrono::seconds(30)) == 5);
+    for (double invalid : {0.0, -1.0, 1001.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
+        bool rejected = false;
+        try { ScrollClock clock(invalid, start); }
+        catch (const std::invalid_argument&) { rejected = true; }
+        assert(rejected);
+    }
     Magick::InitializeMagick(nullptr);
     assets = (std::filesystem::temp_directory_path() /
         ("scoreboard-tests-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))).string() + "/";
@@ -109,6 +130,28 @@ int main() {
     assert(display.canvas->pixels()[(4 * 256 + 1) * 3] == 255);
     assert(display.image_cache.size() == count);
     assert(std::rename((assets + "cache.hidden").c_str(), (assets + "cache.bmp").c_str()) == 0);
+    // Batched movement must preserve spacing and indices through multiple wraps.
+    SportsDisplay stepped(32, 64, 4, "regular", true, true);
+    SportsDisplay batched(32, 64, 4, "regular", true, true);
+    std::vector<Competition> stepped_games, batched_games;
+    for (const std::string sport : {"football", "baseball", "basketball"})
+        stepped_games.push_back(fixture(sport, "in"));
+    batched_games = stepped_games;
+    for (int n = 0; n < 2000; ++n) stepped.draw(stepped_games, assets, 1);
+    batched.draw(batched_games, assets, 2000);
+    stepped.draw(stepped_games, assets, 0);
+    batched.draw(batched_games, assets, 0);
+    assert(stepped.canvas->pixels() == batched.canvas->pixels());
+    const auto stationary = batched.canvas->pixels();
+    for (int n = 0; n < 10; ++n) batched.draw(batched_games, assets, 0);
+    assert(stationary == batched.canvas->pixels());
+    stepped.first_pass = batched.first_pass = true;
+    std::vector<Team> stepped_ranks = ranks, batched_ranks = ranks;
+    for (int n = 0; n < 1000; ++n) stepped.render_rankings(stepped_ranks, assets, 1);
+    batched.render_rankings(batched_ranks, assets, 1000);
+    stepped.render_rankings(stepped_ranks, assets, 0);
+    batched.render_rankings(batched_ranks, assets, 0);
+    assert(stepped.canvas->pixels() == batched.canvas->pixels());
     std::filesystem::remove_all(assets);
-    std::cout << "Scrolling pixel parity, wrapping, refresh, rankings and image-cache checks passed.\n";
+    std::cout << "Scroll timing, pixel parity, wrapping, refresh, rankings and image-cache checks passed.\n";
 }

@@ -653,7 +653,63 @@ void SportsDisplay::drawCard(const Card& card, int x) {
     }
 }
 
-void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir) {
+const SportsDisplay::Card& SportsDisplay::competitionCard(std::vector<Competition>& competitions, int index, const std::string& images_dir) {
+    auto found = competition_cards.find(index);
+    if (found == competition_cards.end()) {
+        CardCanvas raster(canvas->height());
+        render_target = &raster;
+        if (competitions[index].sports_logo_comp) {
+           max_display_x = -999;
+           std::ostringstream oss1("");
+           oss1 << images_dir << competitions[index].league << ".bmp";
+           drawImage(oss1.str(), 0, 0);
+           competitions[index].game_display_width = max_display_x;
+        } else if (competitions[index].sport == "baseball") {
+           draw_baseball(competitions[index], 0, images_dir);
+        } else if (competitions[index].sport == "basketball") {
+           draw_basketball(competitions[index], 0, images_dir);
+        } else if (competitions[index].sport == "football") {
+           draw_football(competitions[index], 0, images_dir);
+        }
+
+        render_target = nullptr;
+        Card card;
+        card.width = std::max(1, competitions[index].game_display_width);
+        raster.pixels.resize(std::max(raster.pixels.size(), static_cast<size_t>(card.width * canvas->height())), Display::Pixel{0, 0, 0});
+        card.pixels = std::move(raster.pixels);
+        found = competition_cards.emplace(index, std::move(card)).first;
+    }
+    competitions[index].game_display_width = found->second.width;
+    return found->second;
+}
+
+const SportsDisplay::Card& SportsDisplay::rankingCard(std::vector<Team>& rankings, int index, const std::string& images_dir) {
+    auto found = ranking_cards.find(index);
+    if (found == ranking_cards.end()) {
+        CardCanvas raster(canvas->height());
+        render_target = &raster;
+        if (rankings[index].sports_logo_rank) {
+           max_display_x = -999;
+           std::ostringstream oss1("");
+           oss1 << images_dir << rankings[index].league << ".bmp";
+           drawImageCentered(oss1.str(), 0, 0, 32);
+           rankings[index].game_display_width = max_display_x;
+        } else {
+           draw_ranking(rankings[index], 0, images_dir);
+        }
+
+        render_target = nullptr;
+        Card card;
+        card.width = std::max(1, rankings[index].game_display_width);
+        raster.pixels.resize(std::max(raster.pixels.size(), static_cast<size_t>(card.width * canvas->height())), Display::Pixel{0, 0, 0});
+        card.pixels = std::move(raster.pixels);
+        found = ranking_cards.emplace(index, std::move(card)).first;
+    }
+    rankings[index].game_display_width = found->second.width;
+    return found->second;
+}
+
+void SportsDisplay::draw(std::vector<Competition>& competitions, const std::string& images_dir, int scroll_pixels) {
 
     if (competitions.empty()) return;
     for (int& index : competition_index) index %= competitions.size();
@@ -676,48 +732,24 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
            }
     
            if (first_pass && i > 0)
-               x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space + 1;
-           auto found = competition_cards.find(competition_index[i]);
-           if (found == competition_cards.end()) {
-               CardCanvas raster(canvas->height());
-               render_target = &raster;
-               if (competitions[competition_index[i]].sports_logo_comp) {
-                  max_display_x = -999;
-                  std::ostringstream oss1("");
-                  oss1 << images_dir << competitions[competition_index[i]].league << ".bmp";
-                  drawImage(oss1.str(), 0, 0);
-                  competitions[competition_index[i]].game_display_width = max_display_x;
-               } else if (competitions[competition_index[i]].sport == "baseball") {
-                  draw_baseball(competitions[competition_index[i]], 0, images_dir);
-               } else if (competitions[competition_index[i]].sport == "basketball") {
-                  draw_basketball(competitions[competition_index[i]], 0, images_dir);
-               } else if (competitions[competition_index[i]].sport == "football") {
-                  draw_football(competitions[competition_index[i]], 0, images_dir);
-               }
-    
-               render_target = nullptr;
-               Card card;
-               card.width = std::max(1, competitions[competition_index[i]].game_display_width);
-               raster.pixels.resize(std::max(raster.pixels.size(), static_cast<size_t>(card.width * canvas->height())), Display::Pixel{0, 0, 0});
-               card.pixels = std::move(raster.pixels);
-               found = competition_cards.emplace(competition_index[i], std::move(card)).first;
-           }
-           competitions[competition_index[i]].game_display_width = found->second.width;
-           drawCard(found->second, x_init[i]);
+               x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
+           const auto& card = competitionCard(competitions, competition_index[i], images_dir);
+           drawCard(card, x_init[i]);
 
-           // Update X-Offset for Scrolling 
-           x_init[i] -= 1;
-    
-           // Increment Competition Index and Reset X-Offset
-           if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
-              competition_index[i] = (competition_index[leading_index] + 1) % int(competitions.size());
-    
-              leading_index = i;
-    
-              update_x_offset(competitions, i);
-           }
+        }
 
-    
+        // Advance all slots together. Handle every wrap even when a slow frame
+        // requires multiple pixels, without presenting intermediate frames.
+        for (int step = 0; step < scroll_pixels; ++step) {
+            for (int& x : x_init) --x;
+            for (int i = 0; i < 4; ++i) {
+                if (x_init[i] <= -competitions[competition_index[i]].game_display_width) {
+                    competition_index[i] = (competition_index[leading_index] + 1) % competitions.size();
+                    leading_index = i;
+                    competitionCard(competitions, competition_index[i], images_dir);
+                    update_x_offset(competitions, i);
+                }
+            }
         }
 
         canvas = matrix->SwapOnVSync(canvas);
@@ -753,7 +785,7 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
 }
 
 
-void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::string& images_dir) {
+void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::string& images_dir, int scroll_pixels) {
     if (rankings.empty()) return;
     for (int& index : rank_index) index %= rankings.size();
     // Number of Ranks to Draw
@@ -770,42 +802,21 @@ void SportsDisplay::render_rankings(std::vector<Team>& rankings, const std::stri
        }
 
        if (first_pass && i > 0)
-           x_init[i] = x_init[i-1] + rankings[rank_index[i-1]].game_display_width + rank_space + 1;
-       auto found = ranking_cards.find(rank_index[i]);
-       if (found == ranking_cards.end()) {
-           CardCanvas raster(canvas->height());
-           render_target = &raster;
-           if (rankings[rank_index[i]].sports_logo_rank) {
-              max_display_x = -999;
-              std::ostringstream oss1("");
-              oss1 << images_dir << rankings[rank_index[i]].league << ".bmp";
-              drawImageCentered(oss1.str(), 0, 0, 32);
-              rankings[rank_index[i]].game_display_width = max_display_x;
-           } else {
-              draw_ranking(rankings[rank_index[i]], 0, images_dir);
-           }
+           x_init[i] = x_init[i-1] + rankings[rank_index[i-1]].game_display_width + rank_space;
+       const auto& card = rankingCard(rankings, rank_index[i], images_dir);
+       drawCard(card, x_init[i]);
 
-           render_target = nullptr;
-           Card card;
-           card.width = std::max(1, rankings[rank_index[i]].game_display_width);
-           raster.pixels.resize(std::max(raster.pixels.size(), static_cast<size_t>(card.width * canvas->height())), Display::Pixel{0, 0, 0});
-           card.pixels = std::move(raster.pixels);
-           found = ranking_cards.emplace(rank_index[i], std::move(card)).first;
-       }
-       rankings[rank_index[i]].game_display_width = found->second.width;
-       drawCard(found->second, x_init[i]);
-
-       // Update X-Offset for Scrolling 
-       x_init[i] -= 1;
-
-       // Increment Ranking Index and Reset X-Offset
-       if (!first_pass && x_init[i] <= -rankings[rank_index[i]].game_display_width) {
-          rank_index[i] = (rank_index[leading_index] + 1) % int(rankings.size());
-          leading_index = i;
-
-          update_x_offset(rankings, i);
-       }
-
+    }
+    for (int step = 0; step < scroll_pixels; ++step) {
+        for (int& x : x_init) --x;
+        for (int i = 0; i < 4; ++i) {
+            if (x_init[i] <= -rankings[rank_index[i]].game_display_width) {
+                rank_index[i] = (rank_index[leading_index] + 1) % rankings.size();
+                leading_index = i;
+                rankingCard(rankings, rank_index[i], images_dir);
+                update_x_offset(rankings, i);
+            }
+        }
     }
 
     canvas = matrix->SwapOnVSync(canvas);

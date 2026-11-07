@@ -31,9 +31,9 @@ public:
     void draw_touchdown(const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
-    void draw(std::vector<Competition>& competitions, const std::string& images_dir);
+    void draw(std::vector<Competition>& competitions, const std::string& images_dir, int scroll_pixels = 1);
     void invalidateCards(bool reset_layout = false);
-    void render_rankings(std::vector<Team>& rankings, const std::string& images_dir);
+    void render_rankings(std::vector<Team>& rankings, const std::string& images_dir, int scroll_pixels = 1);
 
 private:
     struct Card {
@@ -43,6 +43,8 @@ private:
     std::map<int, Card> competition_cards;
     std::map<int, Card> ranking_cards;
     void drawCard(const Card& card, int x);
+    const Card& competitionCard(std::vector<Competition>& competitions, int index, const std::string& images_dir);
+    const Card& rankingCard(std::vector<Team>& rankings, int index, const std::string& images_dir);
     struct Pixel {
         uint8_t r, g, b;
     };

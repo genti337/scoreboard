@@ -4,6 +4,7 @@
 #include "../include/SportsDisplay.hh"
 #include "../include/WeatherDisplay.hh"
 #include "../include/CountdownDisplay.hh"
+#include "../include/ScrollClock.hh"
 
 #include <json-c/json.h>
 #include <iostream>
@@ -297,7 +298,8 @@ void display_loop(std::atomic<bool>& running,
                   int& weather_index,
                   std::vector<Team>& rankings,
                   std::vector<std::string>& cities,
-                  std::string active_display) {
+                  std::string active_display,
+                  double scroll_speed) {
     printf("Updating Display!\n");
 
 #ifdef MAC_STUB_MATRIX
@@ -323,6 +325,7 @@ void display_loop(std::atomic<bool>& running,
 #endif
 
     auto next_frame = std::chrono::steady_clock::now();
+    ScrollClock scroll_clock(scroll_speed, next_frame);
     std::shared_ptr<const std::vector<Competition>> previous_competitions;
     std::shared_ptr<const std::vector<Weather>> previous_weather;
     std::vector<Competition> competitions;
@@ -351,6 +354,7 @@ void display_loop(std::atomic<bool>& running,
             weather_data = forecast ? *forecast : std::vector<Weather>{};
             previous_weather = forecast;
         }
+        const int scroll_pixels = scroll_clock.advance();
         if (active_display == "weather") {
             if (!weather_data.empty()) {
                 weather_index = weather_display.draw(cities[weather_index], weather_data, weather_index, "../images/");
@@ -361,13 +365,13 @@ void display_loop(std::atomic<bool>& running,
     	    countdown_display.render(month, day, hour, minute, event_name);
 //            std::this_thread::sleep_for(std::chrono::seconds(1));  // Update every second
         } else if (active_display == "rankings") {
-            display.render_rankings(rankings, "../images/");
+            display.render_rankings(rankings, "../images/", scroll_pixels);
 //            std::this_thread::sleep_for(std::chrono::milliseconds(50));  // Fast update
         } else if (active_display == "sports_news") {
             //TODO
         } else {
 
-            if (!competitions.empty()) display.draw(competitions, "../images/");
+            if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
         }
 
         // Rendering and VSync waiting count toward the 25 ms frame budget.
@@ -401,6 +405,7 @@ int main(int argc, char* argv[]) {
     std::string countdown_team = "";
 
     bool scrolling = false;
+    double scroll_speed = 20.0;
 
     // Parse Input Arguments
     for (int i=1; i<argc; i++) {
@@ -445,6 +450,21 @@ int main(int argc, char* argv[]) {
            sports.push_back(sport_args[flag].first);
            leagues.push_back(sport_args[flag].second);
            active_display = "sports";
+       } else if (arg == "--scroll-speed") {
+           if (i + 1 >= argc) {
+               std::cerr << "--scroll-speed requires a number in pixels/second\n";
+               return 1;
+           }
+           try {
+               const std::string value = argv[++i];
+               size_t consumed = 0;
+               scroll_speed = std::stod(value, &consumed);
+               if (consumed != value.size()) throw std::invalid_argument("trailing characters");
+               ScrollClock validate(scroll_speed);
+           } catch (const std::exception&) {
+               std::cerr << "--scroll-speed must be greater than 0 and at most 1000 pixels/second\n";
+               return 1;
+           }
        } else if (arg == "--scrolling") {
           scrolling = true;
        }
@@ -504,7 +524,8 @@ int main(int argc, char* argv[]) {
                               std::ref(weather_index),
                               std::ref(rankings),
                               std::ref(cities),
-                              active_display);
+                              active_display,
+                              scroll_speed);
 
     // Data Loop Thread
     std::thread fetchThread(fetch_loop,
