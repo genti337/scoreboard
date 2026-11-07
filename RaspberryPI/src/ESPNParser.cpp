@@ -2,7 +2,6 @@
 #include <iostream>
 #include <algorithm>
 #include <cctype>
-#include <json-c/json.h>
 
 namespace {
 std::string optionalText(const nlohmann::json& object, const char* key) {

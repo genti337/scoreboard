@@ -1,7 +1,6 @@
 #include "../include/Weather.hh"
 #include <iostream>
 #include <sstream>
-#include <json-c/json.h>
 
 // Constructor
 Weather::Weather() {

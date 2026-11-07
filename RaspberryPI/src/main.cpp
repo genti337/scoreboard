@@ -6,7 +6,6 @@
 #include "../include/CountdownDisplay.hh"
 #include "../include/ScrollClock.hh"
 
-#include <json-c/json.h>
 #include <iostream>
 #include <vector>
 #include <thread>
@@ -19,50 +18,13 @@
 #include <chrono>
 #include "led-matrix.h"
 
-#include <unistd.h>
 
-#include <sys/select.h>
 
 #include "led-matrix.h"
 
 using namespace rgb_matrix;
 using namespace Magick;
 
-#ifdef MAC_STUB_MATRIX
-
-static bool enterPressedNonBlocking() {
-
-    fd_set set;
-
-    struct timeval timeout;
-
-    FD_ZERO(&set);
-
-    FD_SET(STDIN_FILENO, &set);
-
-    timeout.tv_sec = 0;
-
-    timeout.tv_usec = 0;
-
-    int rv = select(STDIN_FILENO + 1, &set, nullptr, nullptr, &timeout);
-
-    if (rv > 0 && FD_ISSET(STDIN_FILENO, &set)) {
-
-        char c;
-
-        if (read(STDIN_FILENO, &c, 1) > 0) {
-
-            return c == '\n';
-
-        }
-
-    }
-
-    return false;
-
-}
-
-#endif
 
 int month = 1;
 int day = 1;
@@ -82,8 +44,6 @@ int getCollegeFootballRegularSeasonWeeks() {
     std::string data = fetcher.fetch();
 
     nlohmann::json j = nlohmann::json::parse(data);
-
-    int week = 0;
 
     if (!j.contains("week") || !j["week"].contains("number")) {
         return 0;  // preseason or malformed response

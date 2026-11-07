@@ -5,7 +5,6 @@
 #include <vector>
 #include <ctime>
 #include <curl/curl.h>
-#include <json-c/json.h>
 #include "../include/nlohmann/json.hpp"
 #include "FetchData.hh"
 #include "Weather.hh"

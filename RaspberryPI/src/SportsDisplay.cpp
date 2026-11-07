@@ -162,7 +162,6 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
                              getTextWidth(small_font, competition.time),
                              getTextWidth(small_font, competition.AwayTeam.record),
                              getTextWidth(small_font, competition.HomeTeam.record)});
-       int mid_x = min_x + (max_x + min_x) / 2;
        center_text(small_font, competition.date, min_x, max_x, 15);
        center_text(small_font, competition.time, min_x, max_x, 22);
     // Active Game Display
@@ -396,7 +395,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
     int endzone_offset = 12;
     int field_width = 105;
     int ball_width = 7;
-    bool goingRight = false;
     std::string yard_text;
 
 //    competition.state = "in";
@@ -482,7 +480,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        drawImage("../images/football_small.bmp", x_offset + endzone_offset - (ball_width / 2) + std::round((ball_location / 100) * field_width), 23);
 
        // Period
-       std::string test = "Q";
        center_text(game_font,
                    "Q" + competition.period + " " + competition.clock,
                    x_offset,
@@ -521,7 +518,6 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        }
 
        // Determine what direction the posessing team is driving
-       goingRight = (competition.AwayTeam.team_id == competition.possession_id);
        std::cout << "Possessionion ID : " << competition.possession_id << "\n";
        std::cout << "Home Team ID : " << competition.HomeTeam.team_id << "\n";
        std::cout << "Away Team ID : " << competition.AwayTeam.team_id << "\n";

@@ -57,7 +57,7 @@ int main() {
     status.erase("displayClock");
     assert(parse_clock(status, {{"displayClock", "9:00"}}) == "9:00");
     assert(parse_clock(status, nullptr) == "--:--");
-    for (const json invalid : {json(nullptr), json(12), json("")}) {
+    for (const json& invalid : {json(nullptr), json(12), json("")}) {
         status["displayClock"] = invalid;
         assert(parse_clock(status, nullptr) == "--:--");
     }
@@ -80,13 +80,13 @@ int main() {
         return parsed.back().down_dist;
     };
     assert(parse_down({{"shortDownDistanceText", " 3rd & 8 "}, {"downDistanceText", "other"}}) == "3rd & 8");
-    for (const json empty : {json(nullptr), json(""), json(" \t"), json(12), json(false)})
+    for (const json& empty : {json(nullptr), json(""), json(" \t"), json(12), json(false)})
         assert(parse_down({{"shortDownDistanceText", empty}, {"downDistanceText", "2nd & 6"}}) == "2nd & 6");
     assert(parse_down({{"down", 1}, {"distance", 10}}) == "1st & 10");
     assert(parse_down({{"down", 2}, {"distance", 0}}) == "2nd & 0");
     assert(parse_down({{"down", 4}, {"isGoalToGo", true}}) == "4th & Goal");
     assert(parse_down({{"down", 3}, {"distance", 2}, {"possessionText", nullptr}, {"possession", nullptr}}) == "3rd & 2");
-    for (const json invalid : {json(nullptr), json::array(), json("bad"), json::object(),
+    for (const json& invalid : {json(nullptr), json::array(), json("bad"), json::object(),
          json{{"down", 0}, {"distance", 10}}, json{{"down", 5}, {"distance", 10}},
          json{{"down", 1}, {"distance", -1}}, json{{"down", 1}, {"distance", 101}},
          json{{"down", 1.5}, {"distance", 10}}, json{{"down", 1}, {"distance", nullptr}},

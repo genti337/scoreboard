@@ -7,7 +7,6 @@
 #include <regex>
 #include <iostream>
 
-#include <json-c/json.h>
 #include "../include/nlohmann/json.hpp"
 
 #include "SunStatus.hh"
