@@ -1,6 +1,7 @@
 // Headless regression checks for the Mac matrix stub. Run from RaspberryPI/.
 #include "../include/SportsDisplay.hh"
 #include "../include/ScrollClock.hh"
+#include "../include/ESPNParser.hh"
 #include <cassert>
 #include <cstdio>
 #include <iostream>
@@ -38,6 +39,74 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 }
 
 int main() {
+    ESPNParser parser;
+    auto parse_clock = [&](const json& competition_status, const json& event_status) {
+        const json competition = {{"status", competition_status}, {"date", "2026-11-07T20:00:00Z"},
+                                  {"competitors", json::array()}};
+        const json payload = {{"events", json::array({{{"status", event_status},
+                              {"competitions", json::array({competition})}}})}};
+        std::vector<Competition> parsed;
+        std::string error;
+        assert(parser.parseESPNScoreboard(payload.dump(), parsed, "football", "nfl", {}, &error));
+        assert(parsed.size() == 2);
+        return parsed.back().clock;
+    };
+    json status = {{"type", {{"state", "in"}, {"shortDetail", "3rd Quarter"}, {"name", "STATUS_IN_PROGRESS"}}},
+                   {"period", 3}, {"displayClock", "5:34"}};
+    assert(parse_clock(status, {{"displayClock", "9:00"}}) == "5:34");
+    status.erase("displayClock");
+    assert(parse_clock(status, {{"displayClock", "9:00"}}) == "9:00");
+    assert(parse_clock(status, nullptr) == "--:--");
+    for (const json invalid : {json(nullptr), json(12), json("")}) {
+        status["displayClock"] = invalid;
+        assert(parse_clock(status, nullptr) == "--:--");
+    }
+    status["displayClock"] = "0:00";
+    assert(parse_clock(status, nullptr) == "0:00");
+    status["type"]["name"] = "STATUS_HALFTIME";
+    assert(parse_clock(status, nullptr) == "Half");
+    auto parse_down = [&](const json& situation, bool omit = false, bool halftime = false, const std::string& detail = "") {
+        json game_status = {{"type", {{"state", "in"}, {"shortDetail", halftime ? "Halftime" : "3rd Quarter"}}},
+                            {"period", 3}, {"displayClock", "5:34"}};
+        if (!detail.empty()) game_status["type"]["shortDetail"] = detail;
+        json competition = {{"status", game_status}, {"date", "2026-11-07T20:00:00Z"},
+                            {"competitors", json::array()}};
+        if (!omit) competition["situation"] = situation;
+        const json payload = {{"events", json::array({{{"competitions", json::array({competition})}}})}};
+        std::vector<Competition> parsed;
+        std::string error;
+        assert(parser.parseESPNScoreboard(payload.dump(), parsed, "football", "nfl", {}, &error));
+        assert(parsed.size() == 2 && parsed.back().clock == (halftime ? "Half" : "5:34"));
+        return parsed.back().down_dist;
+    };
+    assert(parse_down({{"shortDownDistanceText", " 3rd & 8 "}, {"downDistanceText", "other"}}) == "3rd & 8");
+    for (const json empty : {json(nullptr), json(""), json(" \t"), json(12), json(false)})
+        assert(parse_down({{"shortDownDistanceText", empty}, {"downDistanceText", "2nd & 6"}}) == "2nd & 6");
+    assert(parse_down({{"down", 1}, {"distance", 10}}) == "1st & 10");
+    assert(parse_down({{"down", 2}, {"distance", 0}}) == "2nd & 0");
+    assert(parse_down({{"down", 4}, {"isGoalToGo", true}}) == "4th & Goal");
+    assert(parse_down({{"down", 3}, {"distance", 2}, {"possessionText", nullptr}, {"possession", nullptr}}) == "3rd & 2");
+    for (const json invalid : {json(nullptr), json::array(), json("bad"), json::object(),
+         json{{"down", 0}, {"distance", 10}}, json{{"down", 5}, {"distance", 10}},
+         json{{"down", 1}, {"distance", -1}}, json{{"down", 1}, {"distance", 101}},
+         json{{"down", 1.5}, {"distance", 10}}, json{{"down", 1}, {"distance", nullptr}},
+         json{{"down", "1"}, {"distance", "10"}}})
+        assert(parse_down(invalid) == "");
+    assert(parse_down(nullptr, true) == "");
+    assert(parse_down({{"shortDownDistanceText", "3rd & 8"}}, false, true) == "Half");
+    assert(parse_down(nullptr, true, true) == "Half");
+    for (const auto& entry : std::vector<std::pair<std::string, std::string>>{
+         {"Kickoff", "Kickoff"}, {"PAT", "PAT"}, {"Extra Point", "PAT"},
+         {"2-Point Conversion", "2pt"}, {"Delayed", "Delay"},
+         {"Suspended", "Suspended"}, {"End of 1st Quarter", "End Q1"},
+         {"End of 3rd", "End Q3"}, {"3rd Quarter", ""}}) {
+        assert(parse_down(json::object(), false, false, entry.first) == entry.second);
+        assert(parse_down(nullptr, true, false, entry.first) == entry.second);
+    }
+    assert(parse_down({{"lastPlay", {{"text", "Kickoff"}, {"type", {{"text", "Kickoff"}}}}}}) == "");
+    assert(parse_down({{"shortDownDistanceText", "--"}}) == "");
+    assert(parse_down({{"shortDownDistanceText", "--"}, {"down", 3}, {"distance", 8}}) == "3rd & 8");
+    assert(parse_down({{"shortDownDistanceText", "2nd & 5"}}, false, false, "Kickoff") == "2nd & 5");
     const auto start = ScrollClock::Clock::time_point{};
     ScrollClock regular(20, start), irregular(20, start), fractional(12.5, start);
     int regular_pixels = 0, irregular_pixels = 0, fractional_pixels = 0;
@@ -121,6 +190,53 @@ int main() {
     ranks.push_back(team);
     for (int frame = 0; frame < 600; ++frame) display.render_rankings(ranks, assets);
     assert(rgb_matrix::g_emulator_pixels == display.canvas->pixels());
+    // Halftime has one centered label and no stale quarter/clock/situation.
+    rgb_matrix::Font halftime_font;
+    assert(halftime_font.LoadFont("../rpi-rgb-led-matrix/fonts/5x7.bdf"));
+    for (auto draw : {&SportsDisplay::draw_football, &SportsDisplay::draw_football2}) {
+        auto halftime = fixture("football", "in");
+        halftime.clock = "Half";
+        halftime.down_dist = "Half";
+        display.canvas->Clear();
+        (display.*draw)(halftime, 0, assets);
+        const auto halftime_pixels = display.canvas->pixels();
+        const int label_width = display.getTextWidth(halftime_font, "Halftime");
+        const int label_x = display.max_display_x - label_width;
+        rgb_matrix::FrameCanvas expected(256, 32);
+        rgb_matrix::DrawText(&expected, halftime_font, label_x, 19,
+                            rgb_matrix::Color(255, 255, 255), nullptr, "Halftime");
+        for (int y = 0; y < 32; ++y)
+            for (int x = label_x; x < 256; ++x)
+                for (int channel = 0; channel < 3; ++channel) {
+                    const int pixel = (y * 256 + x) * 3 + channel;
+                    assert(halftime_pixels[pixel] == expected.pixels()[pixel]);
+                }
+        halftime.period = "4"; halftime.down_dist = "4th & 99";
+        halftime.possession_text = "HOM 1"; halftime.possession_id = "other";
+        halftime.yard_line = 99;
+        display.canvas->Clear();
+        (display.*draw)(halftime, 0, assets);
+        assert(halftime_pixels == display.canvas->pixels());
+    }
+    SportsDisplay live(32, 64, 4, "regular", true, false);
+    std::vector<Competition> live_game{fixture("football", "in")};
+    live_game[0].HomeTeam.team_id = live_game[0].possession_id;
+    live.draw(live_game, assets, 0);
+    const auto old_frame = live.canvas->pixels();
+    assert(live_game[0].yard_line == 35);
+    live_game[0].clock = "1:23";
+    live.invalidateCards();
+    live.draw(live_game, assets, 0);
+    assert(old_frame != live.canvas->pixels());
+    assert(live_game[0].yard_line == 35);
+    auto narrow = fixture("football", "in");
+    narrow.clock = "1:23"; narrow.period = "1";
+    narrow.down_dist.clear(); narrow.possession_text.clear();
+    display.draw_football(narrow, 0, assets);
+    const int narrow_width = narrow.game_display_width;
+    narrow.clock = "12:34";
+    display.draw_football(narrow, 0, assets);
+    assert(narrow.game_display_width > narrow_width);
     // A cached bitmap remains available after its original file disappears.
     display.drawImage((assets + "cache.bmp").c_str(), 0, 0);
     const auto count = display.image_cache.size();

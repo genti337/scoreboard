@@ -340,6 +340,15 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
        draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
        draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
 
+       if (competition.clock == "Half" || competition.down_dist == "Half" || competition.shortDetail == "Halftime") {
+           const int left = max_display_x + 16;
+           const int right = left + getTextWidth(game_font, "Halftime");
+           center_text_vertically(game_font, "Halftime", left, right, 0, 32,
+                                  rgb_matrix::Color(255, 255, 255));
+           competition.game_display_width = max_display_x - x_init;
+           return;
+       }
+
        std::ostringstream oss3("");
        oss3 << images_dir << "possession_football.bmp";
        x_offset = max_display_x + 4;
@@ -350,7 +359,11 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
        }
 
        x_offset = max_display_x + 16;
-       int text_width = getTextWidth(small_font, competition.possession_text);
+       const int text_width = std::max({
+           getTextWidth(game_font, "Q" + competition.period),
+           getTextWidth(game_font, competition.clock),
+           getTextWidth(game_font, competition.down_dist),
+           getTextWidth(game_font, competition.possession_text)});
        center_text(game_font, "Q" + competition.period, x_offset, x_offset+text_width, 8, rgb_matrix::Color(255, 255, 255));
        center_text(game_font, competition.clock, x_offset, x_offset+text_width, 16, rgb_matrix::Color(255, 255, 255));
        center_text(game_font, competition.down_dist, x_offset, x_offset+text_width, 24, rgb_matrix::Color(255, 255, 255));
@@ -392,10 +405,9 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 //    competition.possession_id = competition.AwayTeam.team_id;
 
     // Set the Ball Location
-    if (competition.possession_id == competition.HomeTeam.team_id) {
-       competition.yard_line = (100 - competition.yard_line);
-    }
-    double ball_location = static_cast<double>(competition.yard_line);
+    const int yard_line = competition.possession_id == competition.HomeTeam.team_id
+        ? 100 - competition.yard_line : competition.yard_line;
+    double ball_location = static_cast<double>(yard_line);
 
     // Reset the Maximum X
     max_display_x = -999;
@@ -445,6 +457,15 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
        draw_text(score_font, competition.AwayTeam.score, x_offset, 10, rgb_matrix::Color(255, 255, 0));
        draw_text(score_font, competition.HomeTeam.score, x_offset, 22, rgb_matrix::Color(255, 255, 0));
 
+       if (competition.clock == "Half" || competition.down_dist == "Half" || competition.shortDetail == "Halftime") {
+           const int left = max_display_x + 16;
+           const int right = left + getTextWidth(game_font, "Halftime");
+           center_text_vertically(game_font, "Halftime", left, right, 0, 32,
+                                  rgb_matrix::Color(255, 255, 255));
+           competition.game_display_width = max_display_x - x_init;
+           return;
+       }
+
        // Possession Arrow
        std::ostringstream oss3("");
        oss3 << images_dir << "possession_football.bmp";
@@ -476,10 +497,10 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
                    15,
                    rgb_matrix::Color(255, 255, 255));
 
-       if (competition.yard_line <= 50) {
-          yard_text = std::to_string(competition.yard_line); 
+       if (yard_line <= 50) {
+          yard_text = std::to_string(yard_line);
        } else {
-          yard_text = std::to_string(100 - competition.yard_line); 
+          yard_text = std::to_string(100 - yard_line);
        }
 
        // Determine what direction the posessing team is driving
@@ -610,6 +631,7 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
 
 void SportsDisplay::invalidateCards(bool reset_layout) {
     competition_cards.clear();
+    data_changed = true;
     if (reset_layout) {
         first_pass = true;
         leading_index = 3;
@@ -756,10 +778,13 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
     } else {
 
         auto now = std::chrono::steady_clock::now();
-        if (first_pass || (now - last_index_update >= std::chrono::seconds(10))) {
-
-           last_index_update = std::chrono::steady_clock::now();
-           competition_index[1] = (competition_index[1] + 1) % competitions.size();
+        const bool rotate = first_pass || now - last_index_update >= std::chrono::seconds(10);
+        if (rotate || data_changed) {
+           if (rotate) {
+               last_index_update = now;
+               competition_index[1] = (competition_index[1] + 1) % competitions.size();
+           }
+           canvas->Clear();
 	   if (competition_index[1] == 0 && competitions.size() > 1 && competitions[0].sports_logo_comp) competition_index[1] = 1;
 
            if (competitions[competition_index[1]].sport == "baseball") {
@@ -782,6 +807,7 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
 
     // Reset the First Pass Flag
     first_pass = false;
+    data_changed = false;
 }
 
 

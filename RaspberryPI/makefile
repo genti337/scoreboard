@@ -61,6 +61,6 @@ ifeq ($(UNAME), Darwin)
 .PHONY: test
 test:
 	@mkdir -p $(OBJDIR)
-	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -g tests/scrolling.cpp src/Display.cpp src/SportsDisplay.cpp src/Competition.cpp src/Team.cpp -o $(OBJDIR)/scrolling_test $(LDFLAGS) $(filter-out -lSDL2,$(LIBS))
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -g tests/scrolling.cpp src/ESPNParser.cpp src/Display.cpp src/SportsDisplay.cpp src/Competition.cpp src/Team.cpp -o $(OBJDIR)/scrolling_test $(LDFLAGS) $(filter-out -lSDL2,$(LIBS))
 	ASAN_OPTIONS=detect_leaks=0 ./$(OBJDIR)/scrolling_test
 endif

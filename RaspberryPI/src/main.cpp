@@ -274,12 +274,18 @@ void fetch_loop(std::atomic<bool>& running,
                    std::cerr << "No data received.\n";
                }
             }
+            const bool live_games = std::any_of(next_competitions->begin(), next_competitions->end(),
+                [](const Competition& game) { return !game.sports_logo_comp && game.state == "in"; });
             if (complete) {
                 std::lock_guard<std::mutex> lock(shared_data.mutex);
                 shared_data.competitions = std::move(next_competitions);
             }
 
-            std::this_thread::sleep_for(std::chrono::seconds(60));  // Fast update
+            // Poll live scores more often; the display shows the reported clock
+            // rather than guessing whether the actual game clock is running.
+            const int poll_seconds = live_games ? 10 : 60;
+            for (int second = 0; second < poll_seconds && running; ++second)
+                std::this_thread::sleep_for(std::chrono::seconds(1));
         } else {
             return;
         }

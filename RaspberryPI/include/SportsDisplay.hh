@@ -70,6 +70,7 @@ private:
     int num_rank_display;
 
     bool scroll_display;
+    bool data_changed = true;
 };
 
 #endif

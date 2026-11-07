@@ -1,6 +1,63 @@
 #include "../include/ESPNParser.hh"
 #include <iostream>
+#include <algorithm>
+#include <cctype>
 #include <json-c/json.h>
+
+namespace {
+std::string optionalText(const nlohmann::json& object, const char* key) {
+    if (!object.is_object()) return {};
+    const auto field = object.find(key);
+    if (field == object.end() || !field->is_string()) return {};
+    const auto text = field->get<std::string>();
+    const auto first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return {};
+    return text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1);
+}
+
+std::string footballDownDistance(const nlohmann::json& situation) {
+    for (const char* key : {"shortDownDistanceText", "downDistanceText"}) {
+        auto text = optionalText(situation, key);
+        if (!text.empty() && text != "--" && text != "-" && text != "N/A") return text;
+    }
+    if (!situation.is_object()) return {};
+    const auto down = situation.find("down");
+    if (down == situation.end() || !down->is_number_integer() || *down < 1 || *down > 4)
+        return {};
+    static const char* ordinals[] = {"", "1st", "2nd", "3rd", "4th"};
+    const std::string prefix = std::string(ordinals[down->get<int>()]) + " & ";
+    const auto goal = situation.find("isGoalToGo");
+    if (goal != situation.end() && goal->is_boolean() && goal->get<bool>())
+        return prefix + "Goal";
+    const auto distance = situation.find("distance");
+    if (distance == situation.end() || !distance->is_number_integer() || *distance < 0 || *distance > 100)
+        return {};
+    return prefix + std::to_string(distance->get<int>());
+}
+
+std::string missingDownDistanceLabel(const nlohmann::json& status) {
+    if (!status.is_object() || !status.contains("type") || !status.at("type").is_object())
+        return "";
+    const auto& type = status.at("type");
+    if (optionalText(type, "name") == "STATUS_HALFTIME") return "Half";
+    // Only exact current-status labels are evidence. lastPlay describes a
+    // completed play and must not be used to guess the next play's situation.
+    for (const char* key : {"shortDetail", "detail", "description"}) {
+        auto text = optionalText(type, key);
+        std::transform(text.begin(), text.end(), text.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (text == "halftime" || text == "half time") return "Half";
+        if (text == "kickoff" || text == "kick off") return "Kickoff";
+        if (text == "pat" || text == "extra point" || text == "extra point attempt") return "PAT";
+        if (text == "2-point conversion" || text == "two-point conversion") return "2pt";
+        if (text == "delayed" || text == "delay") return "Delay";
+        if (text == "suspended") return "Suspended";
+        if (text == "end of 1st" || text == "end of 1st quarter") return "End Q1";
+        if (text == "end of 3rd" || text == "end of 3rd quarter") return "End Q3";
+    }
+    return "";
+}
+}
 
 // Constructor
 ESPNParser::ESPNParser() {
@@ -203,8 +260,22 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             ctx = "events[" + std::to_string(ei) + "].competitions[0].status.period";
             game.period = std::to_string(comp.at("status").at("period").get<int>());
 
-//FIXME            ctx = "events[" + std::to_string(ei) + "].competitions[0].status.displayClock";
-//FIXME            game.clock = comp.at("status").at("displayClock").get<std::string>();
+            // displayClock is optional. Some payloads expose it on event.status.
+            const auto read_clock = [](const nlohmann::json& status) -> std::string {
+                if (!status.is_object()) return {};
+                const auto found = status.find("displayClock");
+                return found != status.end() && found->is_string()
+                    ? found->get<std::string>() : std::string{};
+            };
+            const auto& status = comp.at("status");
+            game.clock = read_clock(status);
+            if (game.clock.empty() && event.contains("status"))
+                game.clock = read_clock(event.at("status"));
+            if (game.clock.empty()) game.clock = "--:--";
+            const auto& status_type = status.at("type");
+            const auto name = status_type.find("name");
+            if ((name != status_type.end() && name->is_string() && *name == "STATUS_HALFTIME") ||
+                game.shortDetail == "Halftime") game.clock = "Half";
 
             // Date/time
             ctx = "events[" + std::to_string(ei) + "].competitions[0].date";
@@ -261,8 +332,11 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 }
             }
 
+            // Never carry a previous game's situation into a missing update.
+            if (sport == "football" && game.state == "in")
+                game.down_dist = missingDownDistanceLabel(status);
             // Situation Data (optional; only if in-progress)
-            if (game.state == "in" && comp.contains("situation") && !comp.at("situation").is_null()) {
+            if (game.state == "in" && comp.contains("situation") && comp.at("situation").is_object()) {
                 ctx = "events[" + std::to_string(ei) + "].competitions[0].situation";
                 const nlohmann::json& sit = comp.at("situation");
 
@@ -273,19 +347,12 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     game.on_second= sit.value("onSecond", false);
                     game.on_third = sit.value("onThird", false);
                 } else if (sport == "football") {
-                    if (sit.contains("shortDownDistanceText")) {
-                        ctx += ".shortDownDistanceText";
-                        game.down_dist = sit.at("shortDownDistanceText").get<std::string>();
+                    if (game.clock != "Half") {
+                        const auto down_distance = footballDownDistance(sit);
+                        if (!down_distance.empty()) game.down_dist = down_distance;
                     }
-                    // If you later add possession fields, guard them similarly
-                    if (sit.contains("possessionText")) {
-                        ctx += ".possession_text";
-                        game.possession_text = sit.at("possessionText").get<std::string>();
-                    }
-                    if (sit.contains("possession")) {
-                        ctx += ".possession";
-                        game.possession_id = sit.at("possession").get<std::string>();
-                    }
+                    game.possession_text = optionalText(sit, "possessionText");
+                    game.possession_id = optionalText(sit, "possession");
                 }
             }
 
