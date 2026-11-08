@@ -6,6 +6,7 @@
 #include "../include/CountdownDisplay.hh"
 #include "../include/ScrollClock.hh"
 #include "../include/ProcessLifetime.hh"
+#include "../include/ScoringCelebrations.hh"
 
 #include <iostream>
 #include <vector>
@@ -97,6 +98,7 @@ bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
 
 struct DisplayData {
     std::mutex mutex;
+    std::deque<ScoringCelebration> celebrations;
     std::shared_ptr<const std::vector<Competition>> competitions;
     std::shared_ptr<const std::vector<Weather>> weather;
 };
@@ -110,7 +112,9 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& leagues,
                 std::vector<std::string>& cities,
                 std::string active_display,
-                std::string default_city) {
+                std::string default_city,
+                std::set<std::string> celebration_teams) {
+    ScoringCelebrations scoring;
     std::string err;
 
     while (running) {
@@ -210,6 +214,26 @@ void fetch_loop(std::atomic<bool>& running,
                    std::cerr << "No data received.\n";
                }
             }
+            if (complete && !celebration_teams.empty()) {
+                for (const auto& game : *next_competitions) {
+                    if (game.sports_logo_comp || game.sport != "football" || game.event_id.empty()
+                        || game.state == "pre" ||
+                        (!celebration_teams.count(game.league + ":" + game.HomeTeam.abbr) &&
+                         !celebration_teams.count(game.league + ":" + game.AwayTeam.abbr))) continue;
+                    try {
+                        FetchData summary("https://site.api.espn.com/apis/site/v2/sports/football/" +
+                            game.league + "/summary?event=" + game.event_id);
+                        scoring.ingest(game, json::parse(summary.fetch()), celebration_teams);
+                    } catch (const std::exception& error) {
+                        std::cerr << "Scoring update unavailable: " << error.what() << std::endl;
+                    }
+                }
+                std::lock_guard<std::mutex> lock(shared_data.mutex);
+                while (!scoring.pending.empty()) {
+                    shared_data.celebrations.push_back(std::move(scoring.pending.front()));
+                    scoring.pending.pop_front();
+                }
+            }
             const bool live_games = std::any_of(next_competitions->begin(), next_competitions->end(),
                 [](const Competition& game) { return !game.sports_logo_comp && game.state == "in"; });
             if (complete) {
@@ -241,7 +265,7 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Team>& rankings,
                   std::vector<std::string>& cities,
                   std::string active_display,
-                  double scroll_speed) {
+                  double scroll_speed, int celebration_seconds) {
     printf("Updating Display!\n");
 
 #ifdef MAC_STUB_MATRIX
@@ -273,6 +297,9 @@ void display_loop(std::atomic<bool>& running,
     std::shared_ptr<const std::vector<Weather>> previous_weather;
     std::vector<Competition> competitions;
     std::vector<Weather> weather_data;
+    std::deque<ScoringCelebration> celebrations;
+    auto celebration_end = next_frame;
+    bool celebrating = false;
     while (running) {
 #ifdef MAC_STUB_MATRIX
 	display.setCanvas(canvas);
@@ -285,6 +312,10 @@ void display_loop(std::atomic<bool>& running,
             std::lock_guard<std::mutex> lock(shared_data.mutex);
             scores = shared_data.competitions;
             forecast = shared_data.weather;
+            while (!shared_data.celebrations.empty()) {
+                celebrations.push_back(std::move(shared_data.celebrations.front()));
+                shared_data.celebrations.pop_front();
+            }
         }
         if (scores != previous_competitions) {
             const bool reset_layout = !previous_competitions ||
@@ -320,7 +351,17 @@ void display_loop(std::atomic<bool>& running,
             //TODO
         } else {
 
-            if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
+            const auto now = std::chrono::steady_clock::now();
+            if (celebrating && now >= celebration_end) {
+                celebrations.pop_front();
+                celebrating = false;
+            }
+            if (!celebrating && !celebrations.empty()) {
+                celebration_end = now + std::chrono::seconds(celebration_seconds);
+                celebrating = true;
+            }
+            if (!celebrations.empty()) display.drawCelebration(celebrations.front(), "../images/");
+            else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
         }
 
         // Rendering and VSync waiting count toward the 25 ms frame budget.
@@ -354,6 +395,9 @@ int main(int argc, char* argv[]) {
     std::string countdown_league = "";
     std::string countdown_team = "";
 
+    std::set<std::string> celebration_teams;
+    int celebration_seconds = 30;
+    std::string celebration_preview;
     bool scrolling = false;
     double scroll_speed = 20.0;
 
@@ -363,7 +407,20 @@ int main(int argc, char* argv[]) {
 
        std::cout << arg << std::endl;
 
-       if (arg == "--weather_display") {
+       if (arg == "--celebration-team" || arg == "--celebration-seconds" || arg == "--celebration-preview") {
+           if (i + 1 >= argc) { std::cerr << arg << " requires a value\n"; return 1; }
+           const std::string value = argv[++i];
+           if (arg == "--celebration-team") celebration_teams.insert(value);
+           else if (arg == "--celebration-preview") celebration_preview = value;
+           else {
+               try {
+                   size_t used = 0;
+                   celebration_seconds = std::stoi(value, &used);
+                   if (used != value.size() || celebration_seconds < 1 || celebration_seconds > 300)
+                       throw std::invalid_argument("duration");
+               } catch (...) { std::cerr << "Celebration duration must be 1–300 seconds\n"; return 1; }
+           }
+       } else if (arg == "--weather_display") {
            active_display = "weather";
        } else if (arg == "--countdown_display") {
            active_display = "countdown";
@@ -441,6 +498,14 @@ int main(int argc, char* argv[]) {
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
     DisplayData shared_data;
+    if (!celebration_preview.empty()) {
+        const auto colon = celebration_preview.find(':');
+        if (colon == std::string::npos) { std::cerr << "Expected league:team for preview\n"; return 1; }
+        Team team;
+        team.abbr = celebration_preview.substr(colon + 1);
+        team.color = "FFD700"; team.alt_color = "FFFFFF";
+        shared_data.celebrations.push_back({team, celebration_preview.substr(0, colon), "TOUCHDOWN!", "PREVIEW"});
+    }
     int weather_index = 0;
     std::vector<Team> rankings;
 
@@ -481,7 +546,7 @@ int main(int argc, char* argv[]) {
                               std::ref(rankings),
                               std::ref(cities),
                               active_display,
-                              scroll_speed);
+                              scroll_speed, celebration_seconds);
 
     // Data Loop Thread
     std::thread fetchThread(fetch_loop,
@@ -494,7 +559,7 @@ int main(int argc, char* argv[]) {
                             std::ref(leagues),
                             std::ref(cities),
                             active_display,
-                            default_city);
+                            default_city, celebration_teams);
 
 #ifdef MAC_STUB_MATRIX
     std::cout << "Close emulator window or press Esc to stop..." << std::endl;

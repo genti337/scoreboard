@@ -10,6 +10,7 @@
 #include "graphics.h"
 #include "../include/Display.hh"
 #include "../include/Competition.hh"
+#include "ScoringCelebrations.hh"
 #include <Magick++.h>
 
 class SportsDisplay : public Display {
@@ -28,7 +29,7 @@ public:
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football2(Competition& competition, int x_init, const std::string& images_dir);
-    void draw_touchdown(const std::string& images_dir);
+    void drawCelebration(const ScoringCelebration& event, const std::string& images_dir);
     void draw_ranking(Team& ranking, int x_init, const std::string& images_dir);
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     void draw(std::vector<Competition>& competitions, const std::string& images_dir, int scroll_pixels = 1);

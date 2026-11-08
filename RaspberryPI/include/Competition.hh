@@ -11,6 +11,7 @@ public:
     Competition();
     ~Competition();
 
+    std::string event_id;
     std::string sport;		// Competition Sport
     std::string league;		// Competition League
     std::string shortDetail;	// Competition Short Detail

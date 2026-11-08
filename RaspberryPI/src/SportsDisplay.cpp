@@ -1,3 +1,4 @@
+#include <cmath>
 #include "../include/SportsDisplay.hh"
 #include "../include/FootballField.hh"
 #include <unistd.h>
@@ -558,8 +559,23 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 }
 
 
-void SportsDisplay::draw_touchdown(const std::string& images_dir) {
-
+void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::string& images_dir) {
+    canvas->Clear();
+    const auto color = brighterHex(event.team.color, event.team.alt_color);
+    const auto tick = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    const float glow = 0.6f + 0.4f * std::sin(tick / 600.0);
+    DrawRectangleBorder(0, 0, display_width, 32, 1,
+        rgb_matrix::Color(color.r * glow, color.g * glow, color.b * glow));
+    const std::string logo = images_dir + event.league + "/" + event.team.abbr + ".bmp";
+    const int logo_width = cachedImage(logo).width;
+    drawImageCentered(logo, 4, 1, 31);
+    const int left = logo_width + 10;
+    const auto heading = event.team.abbr + "  " + event.label;
+    const auto& heading_font = getTextWidth(abbr_font, heading) <= display_width - left - 4 ? abbr_font : game_font;
+    center_text(heading_font, heading, left, display_width - 4, 14, color);
+    center_text(game_font, event.score, left, display_width - 4, 27, rgb_matrix::Color(255,255,255));
+    canvas = matrix->SwapOnVSync(canvas);
 }
 
 void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& images_dir) {

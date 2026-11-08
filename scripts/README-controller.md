@@ -25,6 +25,24 @@ In Sports mode, enable **Scroll scores** for scrolling instead of the static lay
 
 Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that interface. The default remains `0.0.0.0`, matching the original setup. Reserve the Pi's IP in your router for a stable bookmark.
 
+## Football scoring celebrations
+
+In Sports mode, enable **Scoring celebrations**, then select the NFL or college football teams by abbreviation. Each scoring play takes over the full board for **30 seconds by default**; change the duration to any value from 1–300 seconds. The team logo, event, score, and pulsing team-color border appear before the normal display resumes. Choices persist with your other settings. Stop and Start to apply changes.
+
+Enable the corresponding football league above. Conference filters still determine which games are monitored. Only the selected scoring team triggers celebrations. Touchdowns, successful PATs, two-point conversions, field goals, and safeties are supported; an explicitly reported failed conversion gets a no-good announcement. ESPN can combine a touchdown and conversion into one entry; they are queued separately, each for the configured duration. Initial game data establishes a baseline without celebrating earlier scores. Detection follows ESPN updates and can be delayed by the feed or network.
+
+With the display stopped, select a team and press **Preview touchdown** to start a sample celebration. Afterward, normal scores appear; Stop and Start again to use your regular selections. The preview uses a neutral gold/white border; live events use the scoring team's colors.
+
+For direct launches:
+
+```sh
+cd RaspberryPI
+./espn_jsonc --nfl --celebration-team nfl:DAL --celebration-seconds 30
+# College example: --ncaaf --celebration-team college-football:NEB
+```
+
+Rebuild the C++ executable and restart the controller service after installing this update.
+
 ## Start at boot
 
 Edit every `/home/pi/scoreboard` path in `scripts/systemd/scoreboard-controller.service` to match the Pi's checkout, then run:

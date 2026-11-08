@@ -40,6 +40,38 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 }
 
 int main() {
+    {
+        ScoringCelebrations scoring;
+        auto game = fixture("football", "in");
+        game.event_id = "game1";
+        const std::set<std::string> selected{"test:HOM"};
+        scoring.ingest(game, json::object(), selected); // Failed fetch is not a baseline.
+        json summary = {{"scoringPlays", json::array()}};
+        scoring.ingest(game, summary, selected);
+        json play = {{"id", "td1"}, {"team", {{"id", "1"}}}, {"homeScore", 6}, {"awayScore", 0},
+                     {"scoringType", {{"name", "touchdown"}}}};
+        summary["scoringPlays"].push_back(play);
+        scoring.ingest(game, summary, selected);
+        assert(scoring.pending.size() == 1 && scoring.pending[0].label == "TOUCHDOWN!");
+        summary["scoringPlays"][0]["homeScore"] = 7;
+        scoring.ingest(game, summary, selected);
+        assert(scoring.pending.size() == 2 && scoring.pending[1].label == "EXTRA POINT GOOD");
+        scoring.ingest(game, summary, selected);
+        assert(scoring.pending.size() == 2);
+        ScoringCelebrations startup;
+        startup.ingest(game, summary, selected);
+        assert(startup.pending.empty());
+        play["id"] = "awayTD"; play["team"]["id"] = "2";
+        play["homeScore"] = 7; play["awayScore"] = 7;
+        summary["scoringPlays"].push_back(play);
+        scoring.ingest(game, summary, selected);
+        assert(scoring.pending.size() == 2); // Opponent never celebrates.
+        play["id"] = "fg"; play["team"]["id"] = "1";
+        play["homeScore"] = 10; play["scoringType"]["name"] = "field-goal";
+        summary["scoringPlays"].push_back(play);
+        scoring.ingest(game, summary, selected);
+        assert(scoring.pending.back().label == "FIELD GOAL GOOD");
+    }
     ESPNParser parser;
     auto parse_clock = [&](const json& competition_status, const json& event_status) {
         const json competition = {{"status", competition_status}, {"date", "2026-11-07T20:00:00Z"},
@@ -215,6 +247,14 @@ int main() {
         }
     }
     SportsDisplay display(32, 64, 4, "regular", true, true);
+    auto celebration_game = fixture("football", "in");
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets);
+    assert(std::any_of(rgb_matrix::g_emulator_pixels.begin(), rgb_matrix::g_emulator_pixels.end(),
+                       [](uint8_t value) { return value != 0; }));
+    Magick::Image celebration_image;
+    celebration_image.read(256, 32, "RGB", Magick::CharPixel, rgb_matrix::g_emulator_pixels.data());
+    celebration_image.resize(Magick::Geometry(1024, 128));
+    celebration_image.write("/tmp/scoreboard-celebration.png");
     std::vector<Team> ranks;
     display.render_rankings(ranks, assets);
     Team team;

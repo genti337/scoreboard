@@ -239,6 +239,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             game.sport = sport;
             game.league = league;
             game.sports_logo_comp = false;
+            game.event_id = optionalText(event, "id");
 
             ctx = "events[" + std::to_string(ei) + "].competitions";
             const auto& competitionsArr = event.at("competitions");

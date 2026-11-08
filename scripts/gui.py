@@ -96,6 +96,23 @@ HTML = """
     </div>
   </div>
 
+  <div id="celebrations-wrapper">
+    <div class="section-label">Scoring celebrations</div>
+    <label><input type="checkbox" id="celebrations-enabled"> Enable full-board celebrations</label>
+    <label>Seconds per scoring play <input type="number" id="celebration-seconds" min="1" max="300" value="30"></label>
+    <p>Choose scoring teams below. Enable their football league above; conference filters still apply. Stop and Start to apply changes.</p>
+    <button onclick="previewCelebration()">Preview touchdown (display must be stopped)</button>
+    <input id="celebration-search" placeholder="Search team abbreviation" oninput="filterCelebrationTeams()">
+    <div style="max-height:200px;overflow:auto">
+    {% for league, teams in celebration_catalog.items() %}
+    <strong>{{ league }}</strong>
+    {% for team in teams %}
+    <label class="celebration-team" style="display:inline-block;margin:6px"><input type="checkbox" id="celebrate-{{ league }}-{{ team }}" data-celebration="{{ league }}:{{ team }}"> {{ team }}</label>
+    {% endfor %}<br>
+    {% endfor %}
+    </div>
+  </div>
+
   <div id="conference-wrapper">
     <div class="section-label">Conferences</div>
     <div id="conference-section" class="checkbox-group"></div>
@@ -197,6 +214,24 @@ HTML = """
         document.getElementById("status").textContent = error.message;
         document.getElementById("toggle-btn").disabled = true;
       }
+    }
+    async function previewCelebration() {
+      if (running || busy) { alert("Stop the display before previewing."); return; }
+      const selected = document.querySelector("input[data-celebration]:checked");
+      if (!selected) { alert("Choose a celebration team first."); return; }
+      const team = selected.dataset.celebration;
+      const args = {mode: "sports", celebration_preview: team, celebration_seconds: document.getElementById("celebration-seconds").value};
+      args[team.startsWith("nfl:") ? "NFL" : "NCAAF"] = "1";
+      busy = true;
+      try { await saveSettings(); showStatus(await api("/start", {method:"POST", body:JSON.stringify(args)})); }
+      catch (error) { alert(error.message); }
+      finally { busy = false; await refreshStatus(); }
+    }
+    function filterCelebrationTeams() {
+      const search = document.getElementById("celebration-search").value.toUpperCase();
+      document.querySelectorAll(".celebration-team").forEach(el => {
+        el.style.display = el.textContent.toUpperCase().includes(search) ? "inline-block" : "none";
+      });
     }
     function collectSettings() {
       const fields = {};
@@ -328,9 +363,16 @@ HTML = """
           }
         }
 
-        const params = new URLSearchParams(mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs);
+        let celebrationArgs = "";
+        if (mode === "sports" && document.getElementById("celebrations-enabled").checked) {
+          celebrationArgs = "&celebration_seconds=" + encodeURIComponent(document.getElementById("celebration-seconds").value);
+          document.querySelectorAll("input[data-celebration]:checked").forEach(el => {
+            celebrationArgs += "&celebration_team=" + encodeURIComponent(el.dataset.celebration);
+          });
+        }
+        const params = new URLSearchParams(mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs + celebrationArgs);
         showStatus(await api("/start", {method: "POST", body: JSON.stringify(Object.fromEntries(
-          Array.from(new Set(params.keys()), key => [key, ["city", "conf"].includes(key) ? params.getAll(key) : params.get(key)])
+          Array.from(new Set(params.keys()), key => [key, ["city", "conf", "celebration_team"].includes(key) ? params.getAll(key) : params.get(key)])
         ))}));
       } else {
         showStatus(await api("/stop", {method: "POST", body: "{}"}));
@@ -349,6 +391,7 @@ HTML = """
       const isCountdown = (mode === "countdown");
       const isRankings = (mode === "rankings");
 
+      document.getElementById("celebrations-wrapper").classList.toggle("hidden", isWeather || isCountdown || isRankings);
       document.getElementById("sports-wrapper").classList.toggle("hidden", isWeather || isCountdown || isRankings);
       document.getElementById("weather-wrapper").classList.toggle("hidden", !isWeather);
       document.getElementById("conference-wrapper").classList.toggle("hidden", isWeather || isCountdown || isRankings);
@@ -594,7 +637,7 @@ def validate_start(args):
     if mode not in ("sports", "weather", "countdown", "rankings"):
         raise ValueError("Choose a valid display mode.")
     for key, value in args.items():
-        if key in ("city", "conf"):
+        if key in ("city", "conf", "celebration_team"):
             if not isinstance(value, list) or len(value) > 30 or any(not isinstance(item, str) or not item or len(item) > 100 for item in value):
                 raise ValueError(f"Invalid {key} selection.")
         elif not isinstance(value, str) or len(value) > 200 or value.strip().startswith("-"):
@@ -609,6 +652,16 @@ def validate_start(args):
         parts = entry.split("|")
         if len(parts) != 2 or parts[1] != "ncaaf" or parts[0] not in ("ACC", "Big 12", "Big Ten", "CUSA", "SEC", "Pac-12", "AAC", "MAC", "Sun Belt", "MWC"):
             raise ValueError("Choose a valid conference.")
+    for team in args.get("celebration_team", []) + ([args["celebration_preview"]] if args.get("celebration_preview") else []):
+        league, separator, abbr = team.partition(":")
+        if not separator or abbr not in celebration_catalog().get(league, []):
+            raise ValueError("Choose a valid celebration team.")
+    try:
+        duration = int(args.get("celebration_seconds", "30"))
+        if not 1 <= duration <= 300:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError("Celebration duration must be 1–300 seconds.")
     if mode == "countdown":
         try:
             datetime(2000, int(args["month"]), int(args["day"]), int(args["hour"]), int(args["minute"]))
@@ -643,9 +696,16 @@ atexit.register(stop_process)
 process = None
 
 
+def celebration_catalog():
+    return {league: sorted({path.stem for path in (ROOT / "images" / league).glob("*.bmp")
+                            if path.stem.isalnum() and path.stem.isupper()
+                            and path.stem not in {"AFC", "NFC", "NFL", "NCAA"}})
+            for league in ("nfl", "college-football")}
+
+
 @app.route("/")
 def index():
-    return render_template_string(HTML, csrf_token=CSRF_TOKEN)
+    return render_template_string(HTML, csrf_token=CSRF_TOKEN, celebration_catalog=celebration_catalog())
 
 
 @app.route("/start", methods=["POST"])
@@ -691,6 +751,12 @@ def start_app():
                 cmd.append("--ncaabs")
             if nfl:
                 cmd.append("--nfl")
+            if args.get("celebration_preview"):
+                cmd += ["--celebration-preview", args["celebration_preview"]]
+            if args.get("celebration_team") or args.get("celebration_preview"):
+                cmd += ["--celebration-seconds", args.get("celebration_seconds", "30")]
+            for team in args.get("celebration_team", []):
+                cmd += ["--celebration-team", team]
 
         if mode == "weather":
             cmd.append("--weather_display")
