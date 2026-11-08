@@ -93,6 +93,13 @@ void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
 }
 
 int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, int index, const std::string& images_dir) {
+    if (index < 0 || index >= static_cast<int>(weather_data.size()) ||
+        weather_data[index].hourlyForecast.empty()) {
+        draw_weather_text("Weather unavailable");
+        return 0;
+    }
+    canvas->Clear();
+
     // Display Update Index
     if (update_index >= 2) {
        update_index = 0;
@@ -126,7 +133,7 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
 
     // Hourly Forecast
     x_offset = max_display_x + 8;
-    for (int i=1; i<5; i++) {
+    for (int i=1; i<5 && i<static_cast<int>(weather_data[index].hourlyForecast.size()); i++) {
         draw_text(small_font, weather_data[index].hourlyForecast[i].time, x_offset, 6, rgb_matrix::Color(255, 255, 255));
 
         drawWeatherIcon(weather_data[index].hourlyForecast[i].icon, weather_data[index].hourlyForecast[i].isDaytime,
@@ -146,7 +153,7 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
 
     // Seven Day Forecast
     x_offset = max_display_x + 32;
-    for (int i=0; i<10; i+=2) {
+    for (int i=0; i<10 && i<static_cast<int>(weather_data[index].sevenDayForecast.size()); i+=2) {
         draw_text(small_font, weather_data[index].sevenDayForecast[i].day,
                   x_offset, 6, rgb_matrix::Color(255, 255, 255));
 
@@ -157,7 +164,7 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
 //            if (weather_data[index].sevenDayForecast[i].precip_perc > 20) {
                 draw_text(small_font, weather_data[index].sevenDayForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
 //            }
-        } else if (update_index == 1) {
+        } else if (update_index == 1 && i+1<static_cast<int>(weather_data[index].sevenDayForecast.size())) {
             draw_text(small_font, weather_data[index].sevenDayForecast[i+1].temperature, x_offset, 32, rgb_matrix::Color(0, 0, 255));
         } else if (update_index == 2) {
             draw_text(small_font, weather_data[index].sevenDayForecast[i].temperature, x_offset, 32, rgb_matrix::Color(255, 0, 0));
@@ -173,6 +180,8 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
     // Save the Last Pass for the Weather Index
     weather_index_lp = index;
 
+    canvas = matrix->SwapOnVSync(canvas);
+
     // Output the Weather Index
     return weather_index_out;
 }
@@ -180,12 +189,12 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
 
 void WeatherDisplay::draw_weather_text(std::string text) {
     // Clear the Canvas for Update
-//    canvas->Clear();
+    canvas->Clear();
 
     center_text(temp_font, text, 0, 5*64, 20);
 
     // Update the Canvas
-//    canvas = matrix->SwapOnVSync(canvas);
+    canvas = matrix->SwapOnVSync(canvas);
 
     return;
 }

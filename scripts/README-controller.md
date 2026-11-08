@@ -67,3 +67,21 @@ sudo systemctl restart scoreboard-controller
 ```
 
 Refresh Safari and press Start again. Updating only `gui.py` does not replace the compiled scoreboard executable.
+
+## Default weather location
+
+In Weather mode, enter a **Default location**, such as `League City, TX`, to use that city instead of IP detection. This field is saved automatically with your other selections. Leave it blank to estimate the location from the Pi's public IP address. Stop and start the display to apply changes.
+
+Additional cities entered in the controller or with repeated `--city` arguments join the rotation after the default location. Location lookup failures are logged; successfully fetched cities can still display.
+
+From `RaspberryPI`:
+
+```sh
+# Automatic IP-based location
+sudo ./espn_jsonc --weather_display
+
+# League City as the default, with Dallas as an additional city
+sudo ./espn_jsonc --weather_display --default-city "League City, TX" --city "Dallas, TX"
+```
+
+Rebuild with `make` after updating the C++ source, then restart the controller service and refresh Safari.

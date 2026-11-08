@@ -110,7 +110,10 @@ HTML = """
   </div>
 
   <div id="weather-wrapper" class="hidden">
-    <div class="section-label">Cities</div>
+    <label for="default-city">Default location</label>
+    <input type="text" id="default-city" placeholder="League City, TX">
+    <p>Leave blank to estimate your location from the Pi’s internet connection.</p>
+    <div class="section-label">Additional Cities</div>
     <button onclick="openCityModal()">➕ Add City</button>
     <div id="city-list"></div>
   </div>
@@ -286,6 +289,8 @@ HTML = """
         let cityArgs = "";
 
         if (mode === "weather") {
+          const defaultCity = document.getElementById("default-city").value.trim();
+          if (defaultCity) cityArgs += "&default_city=" + encodeURIComponent(defaultCity);
           for (const city of cityList) {
             cityArgs += "&city=" + encodeURIComponent(city);
           }
@@ -592,14 +597,12 @@ def validate_start(args):
         if key in ("city", "conf"):
             if not isinstance(value, list) or len(value) > 30 or any(not isinstance(item, str) or not item or len(item) > 100 for item in value):
                 raise ValueError(f"Invalid {key} selection.")
-        elif not isinstance(value, str) or len(value) > 200 or value.startswith("-"):
+        elif not isinstance(value, str) or len(value) > 200 or value.strip().startswith("-"):
             raise ValueError(f"Invalid {key} value.")
     if mode == "sports" and not any(key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL")):
         raise ValueError("Select at least one sport.")
     if mode == "rankings" and not any(key in args for key in ("NCAAFRankings", "NCAABRankings")):
         raise ValueError("Select at least one rankings sport.")
-    if mode == "weather" and not args.get("city"):
-        raise ValueError("Add at least one city.")
     if any(item.startswith("-") for key in ("city", "conf") for item in args.get(key, [])):
         raise ValueError("Selections cannot begin with a dash.")
     for entry in args.get("conf", []):
@@ -691,6 +694,9 @@ def start_app():
 
         if mode == "weather":
             cmd.append("--weather_display")
+            default_city = args.get("default_city", "").strip()
+            if default_city:
+                cmd += ["--default-city", default_city]
             for city in cities:
                 cmd += ["--city", city]
 

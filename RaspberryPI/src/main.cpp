@@ -49,24 +49,32 @@ bool getCoordinatesFromLocation(double& lat, double& lon) {
         curl_easy_setopt(curl, CURLOPT_URL, "http://ip-api.com/json/");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-        curl_easy_perform(curl);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+        const auto result = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
+        if (result != CURLE_OK) return false;
     }
 
-    auto j = json::parse(response);
-
+    auto j = json::parse(response, nullptr, false);
+    if (!j.is_object() || j.value("status", std::string()) != "success" ||
+        !j.contains("lat") || !j["lat"].is_number() ||
+        !j.contains("lon") || !j["lon"].is_number()) {
+        return false;
+    }
     lat = j["lat"];
     lon = j["lon"];
-
-    std::cout << "Latitude: " << lat << "\n";
-    std::cout << "Longitude: " << lon << "\n";
+    std::cout << "Detected location: " << j.value("city", std::string("Unknown"))
+              << " (" << lat << ", " << lon << ")" << std::endl;
 
     return true;
 }
 
 bool getCoordinatesFromCity(const std::string& city, double& lat, double& lon) {
     CURL* curl = curl_easy_init();
+    if (!curl) return false;
     char* escaped = curl_easy_escape(curl, city.c_str(), 0);
+    if (!escaped) { curl_easy_cleanup(curl); return false; }
     std::string url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + std::string(escaped);
 
     std::cout << "Fetching coordinate URL: " << url << std::endl;
@@ -101,7 +109,8 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& conferences,
                 std::vector<std::string>& leagues,
                 std::vector<std::string>& cities,
-                std::string active_display) {
+                std::string active_display,
+                std::string default_city) {
     std::string err;
 
     while (running) {
@@ -111,32 +120,44 @@ void fetch_loop(std::atomic<bool>& running,
         //std::cout << "Cities : " << cities[0] << std::endl;
 
         if (active_display == "weather") {
-            auto next_weather = std::make_shared<std::vector<Weather>>(cities.size());
-	    for (int i=0; i<int(cities.size()); i++) {
-                double lat, lon;
-                //getCoordinatesFromCity(cities[i], lat, lon);
-                getCoordinatesFromLocation(lat, lon);
-
-                std::ostringstream ss_lat, ss_lon;
-                ss_lat << std::fixed << std::setprecision(4) << lat;
-                ss_lon << std::fixed << std::setprecision(4) << lon;
-                std::ostringstream url;
-                url << "https://api.weather.gov/points/" << ss_lat.str() << "," << ss_lon.str();
-		std::cout << "Fetching Weather URL: " << url.str() << std::endl;
-                FetchData fetcher(url.str());
-                std::string data = fetcher.fetch();
-
-                weather_parser.parseWeather(data, (*next_weather)[i]);
+            auto next_weather = std::make_shared<std::vector<Weather>>();
+            bool complete = true;
+            // A blank default uses the Pi's automatically detected location.
+            std::vector<std::string> locations{default_city};
+            locations.insert(locations.end(), cities.begin(), cities.end());
+            for (const auto& city : locations) {
+                try {
+                    double lat, lon;
+                    if (!(city.empty() ? getCoordinatesFromLocation(lat, lon) : getCoordinatesFromCity(city, lat, lon))) {
+                        throw std::runtime_error("Unable to find city coordinates");
+                    }
+                    std::ostringstream url;
+                    url << "https://api.weather.gov/points/" << std::fixed
+                        << std::setprecision(4) << lat << "," << lon;
+                    std::cout << "Fetching Weather URL: " << url.str() << std::endl;
+                    FetchData fetcher(url.str());
+                    Weather forecast;
+                    weather_parser.parseWeather(fetcher.fetch(), forecast);
+                    if (forecast.hourlyForecast.empty()) {
+                        throw std::runtime_error("No hourly forecast returned");
+                    }
+                    if (!city.empty()) {
+                        forecast.city = city;
+                        forecast.state.clear();
+                    }
+                    next_weather->push_back(std::move(forecast));
+                } catch (const std::exception& error) {
+                    complete = false;
+                    std::cerr << "Weather fetch failed for " << (city.empty() ? "current location" : city) << ": " << error.what() << std::endl;
+                }
             }
-            {
+            if (!next_weather->empty()) {
                 std::lock_guard<std::mutex> lock(shared_data.mutex);
                 shared_data.weather = std::move(next_weather);
             }
-
-            std::cout << "Finished fetching data!" << std::endl;
-
-            std::this_thread::sleep_for(std::chrono::seconds(300));  // Update every 10 min
-            //std::this_thread::sleep_for(std::chrono::seconds(5));  // Update every 10 min
+            std::cout << "Finished fetching weather data!" << std::endl;
+            for (int second = 0; second < (complete ? 300 : 30) && running; ++second)
+                std::this_thread::sleep_for(std::chrono::seconds(1));
 
         } else if (active_display == "sports") {
 
@@ -246,6 +267,7 @@ void display_loop(std::atomic<bool>& running,
 #endif
 
     auto next_frame = std::chrono::steady_clock::now();
+    auto next_weather_frame = next_frame;
     ScrollClock scroll_clock(scroll_speed, next_frame);
     std::shared_ptr<const std::vector<Competition>> previous_competitions;
     std::shared_ptr<const std::vector<Weather>> previous_weather;
@@ -254,7 +276,7 @@ void display_loop(std::atomic<bool>& running,
     while (running) {
 #ifdef MAC_STUB_MATRIX
 	display.setCanvas(canvas);
-	weather_display.setCanvas(canvas);
+
 #endif
 
         std::shared_ptr<const std::vector<Competition>> scores;
@@ -271,15 +293,21 @@ void display_loop(std::atomic<bool>& running,
             previous_competitions = scores;
             display.invalidateCards(reset_layout);
         }
-        if (forecast != previous_weather) {
+        const bool weather_changed = forecast != previous_weather;
+        if (weather_changed) {
             weather_data = forecast ? *forecast : std::vector<Weather>{};
             previous_weather = forecast;
         }
         const int scroll_pixels = scroll_clock.advance();
         if (active_display == "weather") {
-            if (!weather_data.empty()) {
-                weather_index = weather_display.draw(cities[weather_index], weather_data, weather_index, "../images/");
-            } else {
+            if (!weather_data.empty() &&
+                (weather_changed || std::chrono::steady_clock::now() >= next_weather_frame)) {
+                if (weather_index >= static_cast<int>(weather_data.size())) weather_index = 0;
+                const auto& location = weather_data[weather_index];
+                const std::string label = location.city + (location.state.empty() ? "" : ", " + location.state);
+                weather_index = weather_display.draw(label, weather_data, weather_index, "../images/");
+                next_weather_frame = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            } else if (weather_data.empty()) {
                 weather_display.draw_weather_text("Fetching Weather Data!");
             }
         } else if (active_display == "countdown") {
@@ -316,6 +344,7 @@ int main(int argc, char* argv[]) {
        {"--nfl", {"football", "nfl"}},
     };
     std::vector<std::string> cities;
+    std::string default_city;
     std::vector<std::string> conferences;
 
     std::string active_display = "";
@@ -354,6 +383,12 @@ int main(int argc, char* argv[]) {
            minute = std::stoi(argv[++i]);
        } else if (arg == "--event") {
            event_name = argv[++i];
+       } else if (arg == "--default-city") {
+           if (i + 1 >= argc || std::string(argv[i + 1]).rfind("--", 0) == 0) {
+               std::cerr << "--default-city requires a city name\n";
+               return 1;
+           }
+           default_city = argv[++i];
        } else if (arg == "--city") {
            cities.push_back(argv[++i]);
        } else if (arg == "--conference") {
@@ -458,7 +493,8 @@ int main(int argc, char* argv[]) {
                             std::ref(conferences), 
                             std::ref(leagues),
                             std::ref(cities),
-                            active_display);
+                            active_display,
+                            default_city);
 
 #ifdef MAC_STUB_MATRIX
     std::cout << "Close emulator window or press Esc to stop..." << std::endl;

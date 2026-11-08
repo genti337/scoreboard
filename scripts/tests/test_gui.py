@@ -48,14 +48,14 @@ class ControllerTests(unittest.TestCase):
         Path(self.state.name, 'rendered.html').write_text(response.text)
 
     def test_settings_persist_and_validate(self):
-        settings = {'fields': {'mlb': True}, 'cities': ["O'Fallon"], 'countdown': ['', '', '', '']}
+        settings = {'fields': {'mlb': True, 'default-city': 'League City, TX'}, 'cities': ["O'Fallon"], 'countdown': ['', '', '', '']}
         self.assertEqual(self.post('/settings', settings).status_code, 200)
         self.assertEqual(self.client.get('/settings', headers=self.headers).json, settings)
         self.assertEqual(__import__('json').loads(self.gui.SETTINGS_FILE.read_text()), settings)
         self.assertEqual(self.post('/settings', {'fields': []}).status_code, 400)
 
     def test_validation_blocks_bad_commands(self):
-        for args in ({}, {'mode': 'weather'}, {'mode': 'rankings'}, {'mode': 'invalid'},
+        for args in ({}, {'mode': 'rankings'}, {'mode': 'invalid'},
                      {'mode': 'sports', 'MLB': '1', 'conf': ['ACC|--nfl']},
                      {'mode': 'countdown', 'month': '2', 'day': '31', 'hour': '0', 'minute': '0'}):
             with self.subTest(args=args):
@@ -82,6 +82,10 @@ class ControllerTests(unittest.TestCase):
 
     def test_modes_build_expected_arguments(self):
         cases = [
+            ({'mode': 'weather'}, ['--weather_display']),
+            ({'mode': 'weather', 'default_city': 'League City, TX', 'city': ['Dallas, TX']},
+             ['--weather_display', '--default-city', 'League City, TX', '--city', 'Dallas, TX']),
+            ({'mode': 'weather', 'default_city': '   '}, ['--weather_display']),
             ({'mode': 'sports', 'MLB': '1', 'scrolling': '1'}, ['--scrolling', '--mlb']),
             ({'mode': 'sports', 'MLB': '1', 'scrolling': '0'}, ['--mlb']),
             ({'mode': 'weather', 'city': ["O'Fallon", 'Chicago']},

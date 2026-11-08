@@ -61,3 +61,11 @@ test:
 	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -g tests/scrolling.cpp src/ESPNParser.cpp src/Display.cpp src/SportsDisplay.cpp src/Competition.cpp src/Team.cpp -o $(OBJDIR)/scrolling_test $(LDFLAGS) $(filter-out -lSDL2,$(LIBS))
 	ASAN_OPTIONS=detect_leaks=0 ./$(OBJDIR)/scrolling_test
 endif
+
+ifeq ($(UNAME), Darwin)
+.PHONY: test-weather
+test-weather:
+	@mkdir -p $(OBJDIR)
+	$(CXX) $(CXXFLAGS) -fsanitize=address,undefined -g tests/weather.cpp src/Display.cpp src/WeatherDisplay.cpp src/Weather.cpp src/SunStatus.cpp -o $(OBJDIR)/weather_test $(LDFLAGS) $(filter-out -lSDL2,$(LIBS))
+	ASAN_OPTIONS=detect_leaks=0 ./$(OBJDIR)/weather_test
+endif
