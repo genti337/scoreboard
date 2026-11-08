@@ -54,3 +54,16 @@ The controller launches the binary with `RaspberryPI` as its working directory s
 ```
 
 Tests mock the hardware executable and use temporary state. Physical LED rendering, privileged process behavior, and the systemd unit must also be checked on the Pi.
+
+## Display exits immediately under systemd
+
+If the journal shows a successful data fetch followed by `All threads stopped.`, rebuild the scoreboard with the updated `main.cpp`. Earlier versions treated closed standard input as a request to stop. Service launches now wait for SIGTERM/SIGINT; terminal launches still support Enter to stop.
+
+From the repository root on the Pi:
+
+```sh
+make -C RaspberryPI
+sudo systemctl restart scoreboard-controller
+```
+
+Refresh Safari and press Start again. Updating only `gui.py` does not replace the compiled scoreboard executable.

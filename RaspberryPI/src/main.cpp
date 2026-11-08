@@ -5,6 +5,7 @@
 #include "../include/WeatherDisplay.hh"
 #include "../include/CountdownDisplay.hh"
 #include "../include/ScrollClock.hh"
+#include "../include/ProcessLifetime.hh"
 
 #include <iostream>
 #include <vector>
@@ -485,7 +486,7 @@ int main(int argc, char* argv[]) {
     rgb_matrix::EmulatorShutdown();
 
 #else
-    std::cin.get();
+    scoreboard::wait_for_shutdown();
     running = false;
     displayThread.join();
     fetchThread.join();
