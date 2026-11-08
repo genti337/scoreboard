@@ -1,6 +1,9 @@
 #ifndef DISPLAY_H
 #define DISPLAY_H
 
+// ImageMagick 6 can first include assert.h inside namespace MagickCore.
+// Load it globally so later users (including nlohmann JSON) find __assert_fail.
+#include <cassert>
 #include <string>
 #include <sstream>
 #include <map>

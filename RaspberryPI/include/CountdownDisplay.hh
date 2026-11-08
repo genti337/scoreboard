@@ -1,6 +1,8 @@
 #ifndef COUNTDOWN_DISPLAY_H
 #define COUNTDOWN_DISPLAY_H
 
+// Keep assert.h declarations global before ImageMagick 6 includes its headers.
+#include <cassert>
 #include <string>
 #include <sstream>
 #include <map>
