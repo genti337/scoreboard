@@ -19,7 +19,9 @@ For a manual run:
 
 The display command uses `sudo -n` when the controller is not root. It fails visibly if passwordless permission is unavailable. Use the boot service below for unattended hardware access instead of granting broad passwordless sudo access.
 
-On first launch a random password is written to `.controller/password` with owner-only permissions. Read it locally and sign into Safari using username `scoreboard` and that password. You can override it with the `SCOREBOARD_PASSWORD` environment variable. Password authentication uses local HTTP, so use a trusted LAN. For HTTPS, terminate TLS in a local reverse proxy. The controller uses CSRF tokens, rejects unauthenticated requests, and never accepts state-changing GET requests.
+Open the controller directly in Safari; no username or password is required. Devices that can reach the Pi on your LAN can control the display. CSRF protection remains enabled, and state-changing requests still require POST.
+
+In Sports mode, enable **Scroll scores** for scrolling instead of the static layout. The selection is saved with the other settings and applies the next time you start the display. Rankings scroll automatically.
 
 Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that interface. The default remains `0.0.0.0`, matching the original setup. Reserve the Pi's IP in your router for a stable bookmark.
 
@@ -31,12 +33,11 @@ Edit every `/home/pi/scoreboard` path in `scripts/systemd/scoreboard-controller.
 sudo cp scripts/systemd/scoreboard-controller.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now scoreboard-controller
-sudo cat /var/lib/scoreboard-controller/password
 ```
 
 The service runs as root because the LED matrix requires hardware access. It uses a read-only filesystem except its private state directory and temporary files. Restrict access to your trusted LAN. Stop any manually launched controller/display before starting it. Run one controller instance; status tracks only the display process it launched, not unrelated displays started from a terminal.
 
-Settings and the generated password live in `/var/lib/scoreboard-controller` with the service, or `.controller` for manual runs. Copy `settings.json` between those directories if migrating saved selections. Settings persist across browser refreshes and controller restarts. A stopped display stays stopped; saved selections are applied when you press Start. The service restarts the controller after failures and starts it at boot; it does not automatically turn on the display.
+Settings live in `/var/lib/scoreboard-controller` with the service, or `.controller` for manual runs. Copy `settings.json` between those directories if migrating saved selections. Settings persist across browser refreshes and controller restarts. A stopped display stays stopped; saved selections are applied when you press Start. The service restarts the controller after failures and starts it at boot; it does not automatically turn on the display.
 
 ```sh
 sudo systemctl status scoreboard-controller

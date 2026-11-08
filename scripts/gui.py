@@ -17,12 +17,6 @@ app = Flask(__name__)
 ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = Path(os.environ.get("SCOREBOARD_STATE_DIR", ROOT / ".controller"))
 STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-PASSWORD_FILE = STATE_DIR / "password"
-if not os.environ.get("SCOREBOARD_PASSWORD") and not PASSWORD_FILE.exists():
-    fd = os.open(PASSWORD_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(fd, "w") as password_file:
-        password_file.write(secrets.token_urlsafe(18))
-PASSWORD = os.environ.get("SCOREBOARD_PASSWORD") or PASSWORD_FILE.read_text().strip()
 CSRF_TOKEN = secrets.token_urlsafe(32)
 SETTINGS_FILE = STATE_DIR / "settings.json"
 process_lock = threading.RLock()
@@ -30,10 +24,6 @@ process_lock = threading.RLock()
 
 @app.before_request
 def protect_controller():
-    auth = request.authorization
-    if not auth or auth.username != "scoreboard" or not hmac.compare_digest((auth.password or "").encode(), PASSWORD.encode()):
-        return ("Sign in with username scoreboard and your controller password.", 401,
-                {"WWW-Authenticate": 'Basic realm="Scoreboard"'})
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), CSRF_TOKEN):
             return jsonify(error="Page expired. Reload and try again."), 403
@@ -94,6 +84,7 @@ HTML = """
   </select>
 
   <div id="sports-wrapper">
+    <label><input type="checkbox" id="scrolling"> Scroll scores</label>
     <div class="section-label">Sports</div>
     <div class="checkbox-group">
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
@@ -278,7 +269,7 @@ HTML = """
         const nfl = document.getElementById("nfl").checked ? "NFL=1&" : "";
 
         const mode = document.getElementById("display-mode").value;
-        const modeArg = "mode=" + mode;
+        const modeArg = "mode=" + mode + (mode === "sports" && document.getElementById("scrolling").checked ? "&scrolling=1" : "");
 
         let ncaafRankings = "";
         let ncaabRankings = "";
@@ -683,6 +674,8 @@ def start_app():
         cmd = ([] if os.geteuid() == 0 else ["sudo", "-n"]) + [str(ROOT / "RaspberryPI" / "espn_jsonc")]
 
         if mode == "sports":
+            if args.get("scrolling") == "1":
+                cmd.append("--scrolling")
             if mlb:
                 cmd.append("--mlb")
             if nba:
@@ -961,6 +954,5 @@ if __name__ == "__main__":
         raise SystemExit(0)
 
     signal.signal(signal.SIGTERM, shutdown)
-    print(f"Controller password: set SCOREBOARD_PASSWORD or read {PASSWORD_FILE}", flush=True)
     from waitress import serve
     serve(app, host=os.environ.get("SCOREBOARD_HOST", "0.0.0.0"), port=5001, threads=4)

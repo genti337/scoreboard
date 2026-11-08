@@ -1,4 +1,3 @@
-import base64
 import importlib.util
 import os
 from pathlib import Path
@@ -13,7 +12,7 @@ class ControllerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.state = tempfile.TemporaryDirectory()
-        with patch.dict(os.environ, SCOREBOARD_STATE_DIR=cls.state.name, SCOREBOARD_PASSWORD='test-password'):
+        with patch.dict(os.environ, SCOREBOARD_STATE_DIR=cls.state.name):
             spec = importlib.util.spec_from_file_location('controller', Path(__file__).resolve().parents[1] / 'gui.py')
             cls.gui = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.gui)
@@ -28,16 +27,16 @@ class ControllerTests(unittest.TestCase):
         self.gui.process = None
         self.client = self.gui.app.test_client()
         self.headers = {
-            'Authorization': 'Basic ' + base64.b64encode(b'scoreboard:test-password').decode(),
             'X-CSRF-Token': self.gui.CSRF_TOKEN,
         }
 
     def post(self, path, data):
         return self.client.post(path, json=data, headers=self.headers)
 
-    def test_auth_and_csrf_required(self):
-        self.assertEqual(self.client.get('/').status_code, 401)
-        self.assertEqual(self.client.post('/start', json={}, headers={'Authorization': self.headers['Authorization']}).status_code, 403)
+    def test_password_free_access_and_csrf_required(self):
+        self.assertEqual(self.client.get('/').status_code, 200)
+        self.assertEqual(self.client.get('/status').status_code, 200)
+        self.assertEqual(self.client.post('/start', json={}, headers={}).status_code, 403)
         self.assertEqual(self.client.get('/start', headers=self.headers).status_code, 405)
         self.assertEqual(self.client.get('/stop', headers=self.headers).status_code, 405)
 
@@ -83,6 +82,8 @@ class ControllerTests(unittest.TestCase):
 
     def test_modes_build_expected_arguments(self):
         cases = [
+            ({'mode': 'sports', 'MLB': '1', 'scrolling': '1'}, ['--scrolling', '--mlb']),
+            ({'mode': 'sports', 'MLB': '1', 'scrolling': '0'}, ['--mlb']),
             ({'mode': 'weather', 'city': ["O'Fallon", 'Chicago']},
              ['--weather_display', '--city', "O'Fallon", '--city', 'Chicago']),
             ({'mode': 'rankings', 'NCAAFRankings': '1', 'NCAABRankings': '1'},
