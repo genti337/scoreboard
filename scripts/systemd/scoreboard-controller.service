@@ -1,0 +1,26 @@
+[Unit]
+Description=Local scoreboard web controller
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Replace /home/pi/scoreboard with your checkout path before installing.
+# The matrix needs root hardware access; the web controller launches it directly.
+User=root
+WorkingDirectory=/home/pi/scoreboard/RaspberryPI
+ExecStart=/home/pi/scoreboard/.venv-controller/bin/python /home/pi/scoreboard/scripts/gui.py
+Environment=SCOREBOARD_STATE_DIR=/var/lib/scoreboard-controller
+StateDirectory=scoreboard-controller
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=3
+KillMode=control-group
+TimeoutStopSec=20
+UMask=0077
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

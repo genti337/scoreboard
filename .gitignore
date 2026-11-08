@@ -2,3 +2,6 @@
 .*swp
 images
 .vscode
+.controller/
+__pycache__/
+.venv-controller/

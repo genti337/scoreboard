@@ -1,10 +1,51 @@
 from flask import Flask, render_template_string, request, jsonify
 import subprocess
+import atexit
+import hmac
+import json
+import os
+from pathlib import Path
+import secrets
+import signal
+import threading
+from functools import wraps
 import requests
 import pytz
 from datetime import datetime, timezone
 
 app = Flask(__name__)
+ROOT = Path(__file__).resolve().parents[1]
+STATE_DIR = Path(os.environ.get("SCOREBOARD_STATE_DIR", ROOT / ".controller"))
+STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+PASSWORD_FILE = STATE_DIR / "password"
+if not os.environ.get("SCOREBOARD_PASSWORD") and not PASSWORD_FILE.exists():
+    fd = os.open(PASSWORD_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as password_file:
+        password_file.write(secrets.token_urlsafe(18))
+PASSWORD = os.environ.get("SCOREBOARD_PASSWORD") or PASSWORD_FILE.read_text().strip()
+CSRF_TOKEN = secrets.token_urlsafe(32)
+SETTINGS_FILE = STATE_DIR / "settings.json"
+process_lock = threading.RLock()
+
+
+@app.before_request
+def protect_controller():
+    auth = request.authorization
+    if not auth or auth.username != "scoreboard" or not hmac.compare_digest((auth.password or "").encode(), PASSWORD.encode()):
+        return ("Sign in with username scoreboard and your controller password.", 401,
+                {"WWW-Authenticate": 'Basic realm="Scoreboard"'})
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), CSRF_TOKEN):
+            return jsonify(error="Page expired. Reload and try again."), 403
+
+
+@app.after_request
+def response_headers(response):
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
 
 HTML = """
 <!DOCTYPE html>
@@ -40,7 +81,9 @@ HTML = """
 </head>
 <body>
   <h1>Display Controller</h1>
-  <button id="toggle-btn" onclick="toggleApp()">Start Display</button>
+  <button id="toggle-btn" onclick="toggleApp()" disabled>Checking Display…</button>
+  <div id="status" role="status" aria-live="polite"></div>
+  <p>Changes apply the next time you start the display.</p>
 
   <div class="section-label">Mode</div>
   <select id="display-mode" onchange="handleModeChange()" style="font-size: 18px; margin-top: 10px;">
@@ -134,7 +177,51 @@ HTML = """
     let countdown_team = "";
     let countdown_abbr = "";
 
+    const csrfToken = {{ csrf_token | tojson }};
+    let busy = false;
+    let saveTimer;
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken, ...options.headers}
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Request failed. Reload and try again.");
+      return data;
+    }
+    function showStatus(data) {
+      running = data.running;
+      const button = document.getElementById("toggle-btn");
+      button.textContent = running ? "Stop Display" : "Start Display";
+      button.disabled = busy;
+      document.getElementById("status").textContent = data.error || (running ? "Display running" : "Display stopped");
+    }
+    async function refreshStatus() {
+      if (busy) return;
+      try { showStatus(await api("/status")); }
+      catch (error) {
+        document.getElementById("status").textContent = error.message;
+        document.getElementById("toggle-btn").disabled = true;
+      }
+    }
+    function collectSettings() {
+      const fields = {};
+      document.querySelectorAll("input[id], select[id]").forEach(el => {
+        if (el.id !== "city-input") fields[el.id] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      return {fields, cities: cityList, countdown: [countdown_sport, countdown_league, countdown_team, countdown_abbr]};
+    }
+    async function saveSettings() {
+      await api("/settings", {method: "POST", body: JSON.stringify(collectSettings())});
+    }
+    function queueSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveSettings().catch(error => {
+        document.getElementById("status").textContent = error.message;
+      }), 400);
+    }
     function updateConferenceSection() {
+      const previous = new Set(Array.from(document.querySelectorAll("#conference-section input:checked"), el => el.id));
       const section = document.getElementById("conference-section");
       section.innerHTML = "";
 
@@ -167,13 +254,19 @@ HTML = """
           wrapper.innerHTML = `
             <input type="checkbox" id="${id}" data-conf="${conf}" data-sport="${sport}"> ${conf}
           `;
+          wrapper.querySelector("input").checked = previous.has(id);
           section.appendChild(wrapper);
           section.appendChild(document.createElement("br"));
         }
       }
     }
 
-    function toggleApp() {
+    async function toggleApp() {
+      if (busy) return;
+      busy = true;
+      document.getElementById("toggle-btn").disabled = true;
+      try {
+      await saveSettings();
       const button = document.getElementById("toggle-btn");
 
       if (!running) {
@@ -193,7 +286,8 @@ HTML = """
         if (mode === "rankings") {
           if (document.getElementById("ncaaf-rankings").checked) {
             ncaafRankings = "NCAAFRankings=1&";
-          } else if (document.getElementById("ncaab-rankings").checked) {
+          }
+          if (document.getElementById("ncaab-rankings").checked) {
             ncaabRankings = "NCAABRankings=1&";
           }
         }
@@ -238,20 +332,18 @@ HTML = """
           }
         }
 
-        fetch("/start?" + mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs)
-          .then(res => res.text())
-          .then(data => {
-            running = true;
-            button.textContent = "Stop Display";
-          });
-
+        const params = new URLSearchParams(mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs);
+        showStatus(await api("/start", {method: "POST", body: JSON.stringify(Object.fromEntries(
+          Array.from(new Set(params.keys()), key => [key, ["city", "conf"].includes(key) ? params.getAll(key) : params.get(key)])
+        ))}));
       } else {
-        fetch("/stop")
-          .then(res => res.text())
-          .then(data => {
-            running = false;
-            button.textContent = "Start Display";
-          });
+        showStatus(await api("/stop", {method: "POST", body: "{}"}));
+      }
+      } catch (error) {
+        document.getElementById("status").textContent = error.message;
+      } finally {
+        busy = false;
+        document.getElementById("toggle-btn").disabled = false;
       }
     }
 
@@ -301,11 +393,13 @@ HTML = """
       }
 
       closeCityModal();
+      queueSave();
     }
 
     function removeCity(city) {
       cityList = cityList.filter(c => c !== city);
       updateCityListDisplay();
+      queueSave();
     }
 
     function updateCityListDisplay() {
@@ -315,7 +409,12 @@ HTML = """
       for (const city of cityList) {
         const div = document.createElement("div");
         div.className = "city-tag";
-        div.innerHTML = city + ' <span class="remove-city" onclick="removeCity(\\'' + city + '\\')">&times;</span>';
+        div.appendChild(document.createTextNode(city + " "));
+        const remove = document.createElement("button");
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", "Remove " + city);
+        remove.onclick = () => removeCity(city);
+        div.appendChild(remove);
         container.appendChild(div);
       }
     }
@@ -359,6 +458,7 @@ HTML = """
       if (targetDate) {
         datetimeInput.value = toLocalIsoString(targetDate);
         eventInput.value = eventName;
+        queueSave();
       }
     }
 
@@ -411,7 +511,7 @@ HTML = """
       try {
         const response = await fetch('/get_game_time', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
           body: JSON.stringify({
             team: team,
             abbr: abbr,
@@ -440,6 +540,7 @@ HTML = """
 
         datetimeInput.value = toLocalIsoString(targetDate);
         eventInput.value = eventName;
+        queueSave();
 
       } catch (error) {
         console.error("Error getting game time:", error);
@@ -448,9 +549,31 @@ HTML = """
       }
     }
 
-    window.onload = function () {
+    window.onload = async function () {
       updateTemp();
-      handleModeChange();
+      try {
+        const settings = await api("/settings");
+        const fields = settings.fields || {};
+        const restore = () => Object.entries(fields).forEach(([id, value]) => {
+          const el = document.getElementById(id);
+          if (el && el.id !== "city-input") {
+            if (el.type === "checkbox") el.checked = value === true;
+            else el.value = value;
+          }
+        });
+        restore();
+        handleModeChange();
+        restore();
+        cityList = settings.cities || [];
+        [countdown_sport, countdown_league, countdown_team, countdown_abbr] = settings.countdown || ["", "", "", ""];
+        updateCityListDisplay();
+      } catch (error) {
+        document.getElementById("status").textContent = error.message;
+      }
+      document.addEventListener("change", queueSave);
+      document.addEventListener("input", queueSave);
+      await refreshStatus();
+      setInterval(refreshStatus, 3000);
     };
 
     setInterval(updateTemp, 300000);
@@ -459,33 +582,105 @@ HTML = """
 </html>
 """
 
+app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
+
+
+def locked(function):
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        with process_lock:
+            return function(*args, **kwargs)
+    return wrapper
+
+
+def validate_start(args):
+    mode = args.get("mode", "sports")
+    if mode not in ("sports", "weather", "countdown", "rankings"):
+        raise ValueError("Choose a valid display mode.")
+    for key, value in args.items():
+        if key in ("city", "conf"):
+            if not isinstance(value, list) or len(value) > 30 or any(not isinstance(item, str) or not item or len(item) > 100 for item in value):
+                raise ValueError(f"Invalid {key} selection.")
+        elif not isinstance(value, str) or len(value) > 200 or value.startswith("-"):
+            raise ValueError(f"Invalid {key} value.")
+    if mode == "sports" and not any(key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL")):
+        raise ValueError("Select at least one sport.")
+    if mode == "rankings" and not any(key in args for key in ("NCAAFRankings", "NCAABRankings")):
+        raise ValueError("Select at least one rankings sport.")
+    if mode == "weather" and not args.get("city"):
+        raise ValueError("Add at least one city.")
+    if any(item.startswith("-") for key in ("city", "conf") for item in args.get(key, [])):
+        raise ValueError("Selections cannot begin with a dash.")
+    for entry in args.get("conf", []):
+        parts = entry.split("|")
+        if len(parts) != 2 or parts[1] != "ncaaf" or parts[0] not in ("ACC", "Big 12", "Big Ten", "CUSA", "SEC", "Pac-12", "AAC", "MAC", "Sun Belt", "MWC"):
+            raise ValueError("Choose a valid conference.")
+    if mode == "countdown":
+        try:
+            datetime(2000, int(args["month"]), int(args["day"]), int(args["hour"]), int(args["minute"]))
+        except (KeyError, ValueError, TypeError):
+            raise ValueError("Choose a valid countdown date and time.")
+
+
+def stop_process():
+    global process
+    with process_lock:
+        if process is None or process.poll() is not None:
+            return
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(process.pid, sig)
+            except ProcessLookupError:
+                pass
+            except PermissionError:
+                subprocess.run(["sudo", "-n", "kill", f"-{sig.value}", "--", f"-{process.pid}"], check=True, timeout=5)
+            try:
+                process.wait(timeout=5)
+                process = None
+                return
+            except subprocess.TimeoutExpired:
+                if sig == signal.SIGKILL:
+                    raise
+
+
+atexit.register(stop_process)
+
+
 process = None
 
 
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+    return render_template_string(HTML, csrf_token=CSRF_TOKEN)
 
 
-@app.route("/start")
+@app.route("/start", methods=["POST"])
+@locked
 def start_app():
     global process
+    args = request.get_json(silent=True)
+    if not isinstance(args, dict):
+        return jsonify(error="Expected a JSON object."), 400
+    try:
+        validate_start(args)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
 
     if not process or process.poll() is not None:
-        mlb = "MLB" in request.args
-        nba = "NBA" in request.args
-        ncaaf = "NCAAF" in request.args
-        ncaab = "NCAAB" in request.args
-        ncaabs = "NCAABS" in request.args
-        ncaaf_rankings = "NCAAFRankings" in request.args
-        ncaab_rankings = "NCAABRankings" in request.args
-        nfl = "NFL" in request.args
+        mlb = "MLB" in args
+        nba = "NBA" in args
+        ncaaf = "NCAAF" in args
+        ncaab = "NCAAB" in args
+        ncaabs = "NCAABS" in args
+        ncaaf_rankings = "NCAAFRankings" in args
+        ncaab_rankings = "NCAABRankings" in args
+        nfl = "NFL" in args
 
-        mode = request.args.get("mode", "sports")
-        cities = request.args.getlist("city")
-        conferences = request.args.getlist("conf")
+        mode = args.get("mode", "sports")
+        cities = args.get("city", [])
+        conferences = args.get("conf", [])
 
-        cmd = ["sudo", "../RaspberryPI/./espn_jsonc"]
+        cmd = ([] if os.geteuid() == 0 else ["sudo", "-n"]) + [str(ROOT / "RaspberryPI" / "espn_jsonc")]
 
         if mode == "sports":
             if mlb:
@@ -509,15 +704,14 @@ def start_app():
         elif mode == "countdown":
             cmd.append("--countdown_display")
 
-            event = request.args.get("event")
-            month = request.args.get("month")
-            day = request.args.get("day")
-            hour = request.args.get("hour")
-            minute = request.args.get("minute")
-            sport = request.args.get("sport")
-            league = request.args.get("league")
-            team = request.args.get("team")
-            team_abbr = request.args.get("team_abbr")
+            event = args.get("event")
+            month = args.get("month")
+            day = args.get("day")
+            hour = args.get("hour")
+            minute = args.get("minute")
+            sport = args.get("sport")
+            league = args.get("league")
+            team_abbr = args.get("team_abbr")
 
             if event:
                 cmd += ["--event", event]
@@ -554,30 +748,72 @@ def start_app():
 
         print("Mode : " + mode)
         print(cmd)
-        print(request.args)
+        print(args)
 
-        process = subprocess.Popen(cmd)
-        return "App started."
+        try:
+            process = subprocess.Popen(cmd, cwd=ROOT / "RaspberryPI", start_new_session=True)
+            try:
+                code = process.wait(timeout=0.3)
+                return jsonify(running=False, error=f"Display exited at startup (code {code}). Check the controller log."), 500
+            except subprocess.TimeoutExpired:
+                pass
+        except OSError as error:
+            return jsonify(running=False, error=f"Unable to start display: {error}"), 500
+    return jsonify(running=True)
 
-    return "App already running."
 
-
-@app.route("/stop")
+@app.route("/stop", methods=["POST"])
+@locked
 def stop_app():
-    global process
+    try:
+        stop_process()
+    except (OSError, subprocess.SubprocessError) as error:
+        return jsonify(error=f"Unable to stop display: {error}"), 500
+    return jsonify(running=False)
 
-    if process and process.poll() is None:
-        process.terminate()
-        return "App stopped."
 
-    return "App not running."
+@app.route("/status")
+@locked
+def status():
+    code = process.poll() if process else None
+    return jsonify(running=process is not None and code is None,
+                   error=f"Display exited (code {code}). Check the controller log." if code else None)
+
+
+@app.route("/settings", methods=["GET", "POST"])
+@locked
+def settings():
+    if request.method == "GET":
+        try:
+            return jsonify(json.loads(SETTINGS_FILE.read_text()))
+        except FileNotFoundError:
+            return jsonify({})
+        except (OSError, ValueError):
+            return jsonify(error="Unable to read saved settings."), 500
+    data = request.get_json(silent=True)
+    if (not isinstance(data, dict) or not isinstance(data.get("fields"), dict)
+            or not isinstance(data.get("cities"), list)
+            or any(not isinstance(city, str) or len(city) > 100 for city in data["cities"])
+            or len(data["cities"]) > 30
+            or not isinstance(data.get("countdown"), list)
+            or len(data["countdown"]) != 4
+            or any(not isinstance(value, str) or len(value) > 100 for value in data["countdown"])
+            or any(not isinstance(value, (str, bool)) for value in data["fields"].values())):
+        return jsonify(error="Invalid settings."), 400
+    try:
+        temporary = SETTINGS_FILE.with_suffix(".tmp")
+        temporary.write_text(json.dumps(data))
+        temporary.replace(SETTINGS_FILE)
+    except OSError:
+        return jsonify(error="Unable to save settings."), 500
+    return jsonify(saved=True)
 
 
 @app.route("/temperature")
 def get_temperature():
     try:
         output = subprocess.check_output(
-            ["vcgencmd", "measure_temp"]
+            ["vcgencmd", "measure_temp"], timeout=5
         ).decode()
 
         temp_str = (
@@ -720,4 +956,11 @@ def get_next_game_time():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    def shutdown(signum, frame):
+        stop_process()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, shutdown)
+    print(f"Controller password: set SCOREBOARD_PASSWORD or read {PASSWORD_FILE}", flush=True)
+    from waitress import serve
+    serve(app, host=os.environ.get("SCOREBOARD_HOST", "0.0.0.0"), port=5001, threads=4)
