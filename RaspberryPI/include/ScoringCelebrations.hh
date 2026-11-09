@@ -10,7 +10,12 @@
 struct ScoringCelebration {
     Team team;
     std::string league, label, score;
+    std::string score_detail;
 };
+
+inline std::string celebrationScoreDetail(const std::string& scoring_team, int points) {
+    return points > 0 ? scoring_team + " +" + std::to_string(points) : "NO CHANGE";
+}
 
 inline ScoringCelebration previewCelebration(const std::string& league,
                                             const std::string& abbreviation,
@@ -34,7 +39,9 @@ inline ScoringCelebration previewCelebration(const std::string& league,
         {"field-goal-missed", "FIELD GOAL MISSED"},
         {"field-goal-blocked", "FIELD GOAL BLOCKED"}, {"pat-missed", "PAT MISSED"},
         {"pat-blocked", "PAT BLOCKED"}};
-    return {team, league, labels.at(kind), "PREVIEW"};
+    const int points = kind == "touchdown" ? 6 : kind == "field-goal-good" ? 3 : kind == "pat-good" ? 1 : 0;
+    return {team, league, labels.at(kind), abbreviation + " 23 - OPP 20",
+            celebrationScoreDetail(abbreviation, points)};
 }
 
 class ScoringCelebrations {
@@ -92,9 +99,15 @@ class ScoringCelebrations {
                     !selected.count(game.league + ":" + kicking_team->abbr)) continue;
                 const std::string label = std::string(field_goal ? "FIELD GOAL " : "PAT ") +
                                           (blocked ? "BLOCKED" : "MISSED");
+                int home = 0, away = 0;
+                try { home = std::stoi(game.HomeTeam.score); away = std::stoi(game.AwayTeam.score); }
+                catch (const std::exception&) { continue; }
+                if (play.contains("homeScore") && play["homeScore"].is_number_integer()) home = play["homeScore"].get<int>();
+                if (play.contains("awayScore") && play["awayScore"].is_number_integer()) away = play["awayScore"].get<int>();
                 pending.push_back({*kicking_team, game.league, label,
-                    game.AwayTeam.abbr + " " + game.AwayTeam.score + " - " +
-                    game.HomeTeam.abbr + " " + game.HomeTeam.score});
+                    game.AwayTeam.abbr + " " + std::to_string(away) + " - " +
+                    game.HomeTeam.abbr + " " + std::to_string(home),
+                    celebrationScoreDetail(kicking_team->abbr, 0)});
             }
         };
         if (has_previous) for (const auto& drive : drives["previous"]) readDrive(drive);
@@ -129,22 +142,30 @@ public:
             previous_home = home; previous_away = away;
             const auto type = play.value("scoringType", nlohmann::json::object());
             const auto kind = type.is_object() ? type.value("name", std::string{}) : std::string{};
-            const std::string score = game.AwayTeam.abbr + " " + std::to_string(away) + " - " +
-                                      game.HomeTeam.abbr + " " + std::to_string(home);
-            auto emit = [&](const std::string& component, const std::string& label) {
+            auto emit = [&](const std::string& component, const std::string& label, int points) {
                 if (ids.insert(id + component).second && !baseline && team &&
-                    selected.count(game.league + ":" + team->abbr))
-                    pending.push_back({*team, game.league, label, score});
+                    selected.count(game.league + ":" + team->abbr)) {
+                    // ESPN combines the conversion with the touchdown. Show
+                    // the six-point intermediate score before the queued try.
+                    const int conversion = kind == "touchdown" && points == 6 &&
+                        (increase == 7 || increase == 8) ? increase - 6 : 0;
+                    const int event_home = home - (team == &game.HomeTeam ? conversion : 0);
+                    const int event_away = away - (team == &game.AwayTeam ? conversion : 0);
+                    pending.push_back({*team, game.league, label,
+                        game.AwayTeam.abbr + " " + std::to_string(event_away) + " - " +
+                        game.HomeTeam.abbr + " " + std::to_string(event_home),
+                        celebrationScoreDetail(team->abbr, points)});
+                }
             };
             if (kind == "touchdown") {
-                emit(":score", "TOUCHDOWN!");
-                if (increase == 7) emit(":try", "EXTRA POINT GOOD");
-                else if (increase == 8) emit(":try", "2-POINT GOOD");
+                emit(":score", "TOUCHDOWN!", 6);
+                if (increase == 7) emit(":try", "EXTRA POINT GOOD", 1);
+                else if (increase == 8) emit(":try", "2-POINT GOOD", 2);
 
-            } else if (kind == "field-goal") emit(":score", "FIELD GOAL GOOD");
-            else if (kind == "safety") emit(":score", "SAFETY!");
-            else if (kind == "extra-point") emit(":score", "EXTRA POINT GOOD");
-            else if (kind == "two-point-conversion") emit(":score", "2-POINT GOOD");
+            } else if (kind == "field-goal") emit(":score", "FIELD GOAL GOOD", 3);
+            else if (kind == "safety") emit(":score", "SAFETY!", 2);
+            else if (kind == "extra-point") emit(":score", "EXTRA POINT GOOD", 1);
+            else if (kind == "two-point-conversion") emit(":score", "2-POINT GOOD", 2);
         }
         ingestAttempts(game, summary, selected);
     }

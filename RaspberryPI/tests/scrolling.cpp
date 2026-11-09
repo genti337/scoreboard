@@ -48,6 +48,9 @@ int main() {
         try { previewCelebration("nfl", "DAL", {{"team", {{"color", "bad"}, {"alternateColor", "ffffff"}}}}); }
         catch (const std::invalid_argument&) { invalid_color = true; }
         assert(invalid_color);
+        assert(celebrationScoreDetail("HOM", 6) == "HOM +6");
+        assert(celebrationScoreDetail("HOM", 1) == "HOM +1");
+        assert(celebrationScoreDetail("HOM", 0) == "NO CHANGE");
         ScoringCelebrations scoring;
         auto game = fixture("football", "in");
         game.event_id = "game1";
@@ -63,6 +66,14 @@ int main() {
         summary["scoringPlays"][0]["homeScore"] = 7;
         scoring.ingest(game, summary, selected);
         assert(scoring.pending.size() == 2 && scoring.pending[1].label == "EXTRA POINT GOOD");
+        assert(scoring.pending[0].score_detail == "HOM +6");
+        assert(scoring.pending[1].score_detail == "HOM +1");
+        ScoringCelebrations combined;
+        combined.ingest(game, {{"scoringPlays", json::array()}}, selected);
+        combined.ingest(game, summary, selected);
+        assert(combined.pending.size() == 2);
+        assert(combined.pending[0].score == "AWY 0 - HOM 6");
+        assert(combined.pending[1].score == "AWY 0 - HOM 7");
         scoring.ingest(game, summary, selected);
         assert(scoring.pending.size() == 2);
         ScoringCelebrations startup;
@@ -286,17 +297,17 @@ int main() {
     }
     SportsDisplay display(32, 64, 4, "regular", true, true);
     auto celebration_game = fixture("football", "in");
-    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets);
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23", "HOM +6"}, assets);
     assert(std::any_of(rgb_matrix::g_emulator_pixels.begin(), rgb_matrix::g_emulator_pixels.end(),
                        [](uint8_t value) { return value != 0; }));
     const auto arms_down = rgb_matrix::g_emulator_pixels;
-    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets, 450);
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23", "HOM +6"}, assets, 450);
     const auto arms_mid = rgb_matrix::g_emulator_pixels;
-    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets, 900);
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23", "HOM +6"}, assets, 900);
     assert(arms_down != arms_mid && arms_mid != rgb_matrix::g_emulator_pixels);
     // Heading pixels stay steady as arms and confetti animate around them.
     for (int y = 2; y <= 14; ++y)
-        for (int x = 40; x < 234; ++x)
+        for (int x = 40; x < 216; ++x)
             for (int channel = 0; channel < 3; ++channel) {
                 const int pixel = (y * 256 + x) * 3 + channel;
                 assert(arms_down[pixel] == rgb_matrix::g_emulator_pixels[pixel]);
@@ -305,9 +316,9 @@ int main() {
     celebration_image.read(256, 32, "RGB", Magick::CharPixel, rgb_matrix::g_emulator_pixels.data());
     celebration_image.resize(Magick::Geometry(1024, 128));
     celebration_image.write("/tmp/scoreboard-celebration.png");
-    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23"}, assets, 0);
+    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23", "NO CHANGE"}, assets, 0);
     const auto no_good_out = rgb_matrix::g_emulator_pixels;
-    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23"}, assets, 350);
+    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23", "NO CHANGE"}, assets, 350);
     assert(no_good_out != rgb_matrix::g_emulator_pixels);
     Magick::Image no_good_image;
     no_good_image.read(256, 32, "RGB", Magick::CharPixel, no_good_out.data());

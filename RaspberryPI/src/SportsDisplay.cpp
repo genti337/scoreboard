@@ -574,22 +574,23 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
         // Deterministic particles move with elapsed time, independent of frame rate.
         const auto alternate = colorFromHex(event.team.alt_color);
         const int text_left = logo_width + 28;
-        const int text_right = display_width - 22;
+        const int text_right = display_width - logo_width - 28;
         for (int i = 0; i < display_width / 5; ++i) {
             const int y = 1 + (i * 11 + elapsed_ms / (65 + i % 5 * 13)) % 30;
             const int x = 1 + (i * 37 + elapsed_ms / (180 + i % 7 * 17)) % (display_width - 2);
             // Protect the logo, officials, and both text lines from confetti.
-            if (x < logo_width + 8 ||
+            if (x < logo_width + 8 || x >= display_width - logo_width - 8 ||
                 (y >= 4 && y <= 29 && (x < text_left || x >= text_right)) ||
                 (x >= text_left && x < text_right &&
-                 ((y >= 2 && y <= 14) || (y >= 20 && y <= 27)))) continue;
+                 ((y >= 2 && y <= 14) || (y >= 16 && y <= 30)))) continue;
             const auto particle = i % 3 == 0 ? rgb_matrix::Color(255,255,255) : i % 2 ? color : alternate;
             canvas->SetPixel(x, y, particle.r, particle.g, particle.b);
         }
     }
     drawImageCentered(logo, 4, 1, 31);
+    drawImageCentered(logo, display_width - logo_width - 4, 1, 31);
     int left = logo_width + 10;
-    int right = display_width - 4;
+    int right = display_width - logo_width - 10;
     const bool no_good = event.label.find("MISSED") != std::string::npos ||
                          event.label.find("BLOCKED") != std::string::npos ||
                          event.label.find("NO GOOD") != std::string::npos;
@@ -673,8 +674,10 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
     }
     const auto heading = event.team.abbr + "  " + event.label;
     const auto& heading_font = getTextWidth(abbr_font, heading) <= right - left ? abbr_font : game_font;
-    center_text(heading_font, heading, left, right, 14, color);
-    center_text(game_font, event.score, left, right, 27, rgb_matrix::Color(255,255,255));
+    const bool has_detail = !event.score_detail.empty();
+    center_text(heading_font, heading, left, right, has_detail ? 12 : 14, color);
+    center_text(game_font, event.score, left, right, has_detail ? 22 : 27, rgb_matrix::Color(255,255,255));
+    if (has_detail) center_text(small_font, event.score_detail, left, right, 30, color);
     canvas = matrix->SwapOnVSync(canvas);
 }
 
