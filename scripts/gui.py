@@ -4,6 +4,7 @@ import atexit
 import hmac
 import json
 import os
+import sys
 from pathlib import Path
 import secrets
 import signal
@@ -51,6 +52,17 @@ HTML = """
     input[type="text"], input[type="datetime-local"], select {
       font-size: 18px; padding: 6px; width: 80%;
     }
+    .team-picker { max-width: 620px; margin: 16px auto; padding: 18px; text-align: left; background: #f5f7fa; border: 1px solid #dbe1e8; border-radius: 14px; }
+    .picker-heading { font-weight: bold; margin-bottom: 12px; }
+    #celebration-count, .picker-note { font-size: 14px; color: #526071; }
+    .picker-controls { display: flex; gap: 8px; margin-top: 16px; }
+    .picker-controls select { width: 38%; }
+    .picker-controls input { min-width: 0; width: 62%; padding: 10px; font-size: 16px; border: 1px solid #aeb9c7; border-radius: 6px; }
+    .team-picker button { font-size: 16px; padding: 8px 12px; margin: 4px; border: 1px solid #bbc7d6; border-radius: 20px; background: white; color: #163454; cursor: pointer; }
+    #celebration-selected button { background: #163454; color: white; border-color: #163454; }
+    .team-picker button:focus-visible { outline: 3px solid #448bef; outline-offset: 2px; }
+    #celebration-results { margin-top: 10px; }
+    #celebration-preview-team { display: block; width: 100%; margin-top: 6px; }
     #temp { font-size: 18px; margin-top: 30px; color: #555; }
     .hidden { display: none; }
     .city-tag {
@@ -101,14 +113,35 @@ HTML = """
     <label><input type="checkbox" id="celebrations-enabled"> Enable full-board celebrations</label>
     <label>Seconds per scoring play <input type="number" id="celebration-seconds" min="1" max="300" value="30"></label>
     <p>Choose scoring teams below. Enable their football league above; conference filters still apply. Stop and Start to apply changes.</p>
-    <button onclick="previewCelebration()">Preview touchdown (display must be stopped)</button>
-    <input id="celebration-search" placeholder="Search team abbreviation" oninput="filterCelebrationTeams()">
-    <div style="max-height:200px;overflow:auto">
+    <div class="team-picker">
+      <div class="picker-heading">Your celebration teams <span id="celebration-count"></span></div>
+      <div id="celebration-selected" aria-live="polite"></div>
+      <div class="picker-controls">
+        <select id="celebration-league" aria-label="Filter team league" onchange="filterCelebrationTeams()">
+          <option value="nfl">NFL</option><option value="college-football">College football</option>
+        </select>
+        <input type="search" id="celebration-search" placeholder="Search abbreviation, e.g. DAL or NEB" aria-label="Search celebration teams" oninput="filterCelebrationTeams()">
+      </div>
+      <div id="celebration-results"></div>
+      <p id="celebration-results-note" class="picker-note"></p>
+      <label for="celebration-preview-team">Team to preview</label>
+      <select id="celebration-preview-team"></select>
+    <select id="celebration-preview-kind">
+      <option value="touchdown">Touchdown</option>
+      <option value="field-goal-good">Field goal good</option>
+      <option value="field-goal-missed">Field goal missed</option>
+      <option value="field-goal-blocked">Field goal blocked</option>
+      <option value="pat-good">PAT good</option>
+      <option value="pat-missed">PAT missed</option>
+      <option value="pat-blocked">PAT blocked</option>
+    </select>
+    <button onclick="previewCelebration()">Preview celebration (display must be stopped)</button>
+    </div>
+    <div hidden>
     {% for league, teams in celebration_catalog.items() %}
-    <strong>{{ league }}</strong>
     {% for team in teams %}
-    <label class="celebration-team" style="display:inline-block;margin:6px"><input type="checkbox" id="celebrate-{{ league }}-{{ team }}" data-celebration="{{ league }}:{{ team }}"> {{ team }}</label>
-    {% endfor %}<br>
+    <input type="checkbox" id="celebrate-{{ league }}-{{ team }}" data-celebration="{{ league }}:{{ team }}">
+    {% endfor %}
     {% endfor %}
     </div>
   </div>
@@ -217,21 +250,67 @@ HTML = """
     }
     async function previewCelebration() {
       if (running || busy) { alert("Stop the display before previewing."); return; }
-      const selected = document.querySelector("input[data-celebration]:checked");
-      if (!selected) { alert("Choose a celebration team first."); return; }
-      const team = selected.dataset.celebration;
-      const args = {mode: "sports", celebration_preview: team, celebration_seconds: document.getElementById("celebration-seconds").value};
+      const team = document.getElementById("celebration-preview-team").value;
+      if (!team) { alert("Choose a celebration team first."); return; }
+      const args = {mode: "sports", celebration_preview_kind: document.getElementById("celebration-preview-kind").value, celebration_preview: team, celebration_seconds: document.getElementById("celebration-seconds").value};
       args[team.startsWith("nfl:") ? "NFL" : "NCAAF"] = "1";
       busy = true;
       try { await saveSettings(); showStatus(await api("/start", {method:"POST", body:JSON.stringify(args)})); }
       catch (error) { alert(error.message); }
       finally { busy = false; await refreshStatus(); }
     }
+    function celebrationInputs() {
+      return Array.from(document.querySelectorAll("input[data-celebration]"));
+    }
+    function celebrationTeamName(input) {
+      const [league, abbr] = input.dataset.celebration.split(":");
+      return abbr + " · " + (league === "nfl" ? "NFL" : "College");
+    }
+    function renderCelebrationTeams() {
+      const selected = celebrationInputs().filter(el => el.checked);
+      const container = document.getElementById("celebration-selected");
+      container.replaceChildren();
+      document.getElementById("celebration-count").textContent = "(" + selected.length + "/30)";
+      if (!selected.length) container.textContent = "No teams selected. Search below to add your favorites.";
+      const preview = document.getElementById("celebration-preview-team");
+      const previous = preview.value;
+      preview.replaceChildren();
+      for (const input of selected) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.textContent = celebrationTeamName(input) + " ×";
+        chip.setAttribute("aria-label", "Remove " + celebrationTeamName(input));
+        chip.onclick = () => { input.checked = false; renderCelebrationTeams(); queueSave(); };
+        container.appendChild(chip);
+        preview.add(new Option(celebrationTeamName(input), input.dataset.celebration));
+      }
+      if (selected.some(input => input.dataset.celebration === previous)) preview.value = previous;
+      preview.disabled = !selected.length;
+      filterCelebrationTeams();
+    }
     function filterCelebrationTeams() {
-      const search = document.getElementById("celebration-search").value.toUpperCase();
-      document.querySelectorAll(".celebration-team").forEach(el => {
-        el.style.display = el.textContent.toUpperCase().includes(search) ? "inline-block" : "none";
-      });
+      const search = document.getElementById("celebration-search").value.trim().toUpperCase();
+      const league = document.getElementById("celebration-league").value;
+      const matches = celebrationInputs().filter(input => !input.checked &&
+        input.dataset.celebration.startsWith(league + ":") &&
+        input.dataset.celebration.split(":")[1].includes(search));
+      const results = document.getElementById("celebration-results");
+      results.replaceChildren();
+      for (const input of matches.slice(0, 12)) {
+        const add = document.createElement("button");
+        add.type = "button";
+        add.textContent = "+ " + input.dataset.celebration.split(":")[1];
+        add.setAttribute("aria-label", "Add " + celebrationTeamName(input));
+        add.onclick = () => {
+          if (celebrationInputs().filter(el => el.checked).length >= 30) {
+            alert("You can select up to 30 celebration teams."); return;
+          }
+          input.checked = true; renderCelebrationTeams(); queueSave();
+        };
+        results.appendChild(add);
+      }
+      document.getElementById("celebration-results-note").textContent = !matches.length ? "No matching teams to add." :
+        matches.length > 12 ? "Showing 12 of " + matches.length + " teams. Type to narrow the list." : "Select a team to add it.";
     }
     function collectSettings() {
       const fields = {};
@@ -590,6 +669,7 @@ HTML = """
 
     window.onload = async function () {
       updateTemp();
+      renderCelebrationTeams();
       try {
         const settings = await api("/settings");
         const fields = settings.fields || {};
@@ -603,6 +683,7 @@ HTML = """
         restore();
         handleModeChange();
         restore();
+        renderCelebrationTeams();
         cityList = settings.cities || [];
         [countdown_sport, countdown_league, countdown_team, countdown_abbr] = settings.countdown || ["", "", "", ""];
         updateCityListDisplay();
@@ -656,6 +737,8 @@ def validate_start(args):
         league, separator, abbr = team.partition(":")
         if not separator or abbr not in celebration_catalog().get(league, []):
             raise ValueError("Choose a valid celebration team.")
+    if args.get("celebration_preview_kind", "touchdown") not in ("touchdown", "field-goal-good", "field-goal-missed", "field-goal-blocked", "pat-good", "pat-missed", "pat-blocked"):
+        raise ValueError("Choose a valid preview event.")
     try:
         duration = int(args.get("celebration_seconds", "30"))
         if not 1 <= duration <= 300:
@@ -734,7 +817,7 @@ def start_app():
         cities = args.get("city", [])
         conferences = args.get("conf", [])
 
-        cmd = ([] if os.geteuid() == 0 else ["sudo", "-n"]) + [str(ROOT / "RaspberryPI" / "espn_jsonc")]
+        cmd = ([] if sys.platform == "darwin" or os.geteuid() == 0 else ["sudo", "-n"]) + [str(ROOT / "RaspberryPI" / "espn_jsonc")]
 
         if mode == "sports":
             if args.get("scrolling") == "1":
@@ -752,7 +835,8 @@ def start_app():
             if nfl:
                 cmd.append("--nfl")
             if args.get("celebration_preview"):
-                cmd += ["--celebration-preview", args["celebration_preview"]]
+                cmd += ["--celebration-preview", args["celebration_preview"],
+                        "--celebration-preview-kind", args.get("celebration_preview_kind", "touchdown")]
             if args.get("celebration_team") or args.get("celebration_preview"):
                 cmd += ["--celebration-seconds", args.get("celebration_seconds", "30")]
             for team in args.get("celebration_team", []):

@@ -17,7 +17,7 @@ For a manual run:
 .venv-controller/bin/python scripts/gui.py
 ```
 
-The display command uses `sudo -n` when the controller is not root. It fails visibly if passwordless permission is unavailable. Use the boot service below for unattended hardware access instead of granting broad passwordless sudo access.
+On macOS, the controller launches the emulator directly without `sudo`. Run the controller from Terminal and open `http://localhost:5001` on the same Mac. On the Pi, the display command uses `sudo -n` when the controller is not root. It fails visibly if passwordless permission is unavailable. Use the boot service below for unattended hardware access instead of granting broad passwordless sudo access.
 
 Open the controller directly in Safari; no username or password is required. Devices that can reach the Pi on your LAN can control the display. CSRF protection remains enabled, and state-changing requests still require POST.
 
@@ -27,11 +27,11 @@ Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that inter
 
 ## Football scoring celebrations
 
-In Sports mode, enable **Scoring celebrations**, then select the NFL or college football teams by abbreviation. Each scoring play takes over the full board for **30 seconds by default**; change the duration to any value from 1–300 seconds. The team logo, event, score, and pulsing team-color border appear before the normal display resumes. Choices persist with your other settings. Stop and Start to apply changes.
+In Sports mode, enable **Scoring celebrations**, then use the NFL/College filter and abbreviation search to add teams. Selected teams appear as removable chips; up to 30 teams can be selected. Existing saved selections are preserved. Each scoring play takes over the full board for **30 seconds by default**; change the duration to any value from 1–300 seconds. The team logo, event, score, and pulsing team-color border appear before the normal display resumes. Touchdowns include referees raising their arms every four seconds and falling team-colored confetti around the steady text. Choices persist with your other settings. Stop and Start to apply changes.
 
-Enable the corresponding football league above. Conference filters still determine which games are monitored. Only the selected scoring team triggers celebrations. Touchdowns, successful PATs, two-point conversions, field goals, and safeties are supported; an explicitly reported failed conversion gets a no-good announcement. ESPN can combine a touchdown and conversion into one entry; they are queued separately, each for the configured duration. Initial game data establishes a baseline without celebrating earlier scores. Detection follows ESPN updates and can be delayed by the feed or network.
+Enable the corresponding football league above. Conference filters still determine which games are monitored. Only the selected scoring team triggers celebrations. Touchdowns, successful PATs, two-point conversions, field goals, and safeties are supported; missed or blocked field goals and PATs get a no-good announcement with referees waving their arms horizontally. These alerts follow the selected kicking team, use the same duration, and do not show confetti. Attempts explicitly marked no play or nullified are ignored. ESPN can combine a touchdown and conversion into one entry; they are queued separately, each for the configured duration. Initial game data establishes a baseline without celebrating earlier scores. Detection follows ESPN updates and can be delayed by the feed or network.
 
-With the display stopped, select a team and press **Preview touchdown** to start a sample celebration. Afterward, normal scores appear; Stop and Start again to use your regular selections. The preview uses a neutral gold/white border; live events use the scoring team's colors.
+With the display stopped, select a team and choose an event and press **Preview celebration** to start a sample celebration. Afterward, normal scores appear; Stop and Start again to use your regular selections. The preview fetches the selected team's colors from ESPN and uses the same text and border colors as live celebrations. Allow a moment for the team lookup; if it fails, the controller log reports the error.
 
 For direct launches:
 

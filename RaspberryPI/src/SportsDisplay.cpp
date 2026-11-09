@@ -559,7 +559,7 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 }
 
 
-void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::string& images_dir) {
+void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::string& images_dir, long long elapsed_ms) {
     canvas->Clear();
     const auto color = brighterHex(event.team.color, event.team.alt_color);
     const auto tick = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -569,12 +569,112 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
         rgb_matrix::Color(color.r * glow, color.g * glow, color.b * glow));
     const std::string logo = images_dir + event.league + "/" + event.team.abbr + ".bmp";
     const int logo_width = cachedImage(logo).width;
+    if (event.label == "TOUCHDOWN!" || event.label == "FIELD GOAL GOOD" ||
+        event.label == "EXTRA POINT GOOD") {
+        // Deterministic particles move with elapsed time, independent of frame rate.
+        const auto alternate = colorFromHex(event.team.alt_color);
+        const int text_left = logo_width + 28;
+        const int text_right = display_width - 22;
+        for (int i = 0; i < display_width / 5; ++i) {
+            const int y = 1 + (i * 11 + elapsed_ms / (65 + i % 5 * 13)) % 30;
+            const int x = 1 + (i * 37 + elapsed_ms / (180 + i % 7 * 17)) % (display_width - 2);
+            // Protect the logo, officials, and both text lines from confetti.
+            if (x < logo_width + 8 ||
+                (y >= 4 && y <= 29 && (x < text_left || x >= text_right)) ||
+                (x >= text_left && x < text_right &&
+                 ((y >= 2 && y <= 14) || (y >= 20 && y <= 27)))) continue;
+            const auto particle = i % 3 == 0 ? rgb_matrix::Color(255,255,255) : i % 2 ? color : alternate;
+            canvas->SetPixel(x, y, particle.r, particle.g, particle.b);
+        }
+    }
     drawImageCentered(logo, 4, 1, 31);
-    const int left = logo_width + 10;
+    int left = logo_width + 10;
+    int right = display_width - 4;
+    const bool no_good = event.label.find("MISSED") != std::string::npos ||
+                         event.label.find("BLOCKED") != std::string::npos ||
+                         event.label.find("NO GOOD") != std::string::npos;
+    if (event.label == "TOUCHDOWN!" || event.label == "FIELD GOAL GOOD" ||
+        event.label == "EXTRA POINT GOOD" || no_good) {
+        // 13 x 25 pixel official: raised arms, white cap, striped shirt,
+        // dark trousers. Draw directly so no extra bitmap assets are needed.
+        static const char* referee[] = {
+            "ss.........ss",
+            "ss.........ss",
+            "ww...www...ww",
+            "ww..wwwww..ww",
+            "ww...sss...ww",
+            "ww...sss...ww",
+            "ww...sss...ww",
+            "ww....s....ww",
+            ".ww.wbwbw.ww.",
+            "..wwbwbwbww..",
+            "...wbwbwbw...",
+            "....bwbwb....",
+            "....bwbwb....",
+            "....bwbwb....",
+            "....bwbwb....",
+            "....bwbwb....",
+            "....bbbbb....",
+            "....bbbbb....",
+            "....bb.bb....",
+            "....bb.bb....",
+            "....bb.bb....",
+            "....bb.bb....",
+            "....bb.bb....",
+            "...www.www...",
+            "...www.www..."
+        };
+        auto draw_referee = [&](int x) {
+            for (int y = 0; y < 25; ++y) {
+                for (int dx = 0; dx < 13; ++dx) {
+                    // Body stays fixed while the arms move through three poses.
+                    if (dx < 4 || dx > 8) {
+                        if (y < 23) continue;
+                    }
+                    const char pixel = referee[y][dx];
+                    if (pixel == 'w') canvas->SetPixel(x + dx, y + 4, 255, 255, 255);
+                    else if (pixel == 's') canvas->SetPixel(x + dx, y + 4, 235, 177, 128);
+                    else if (pixel == 'b') canvas->SetPixel(x + dx, y + 4, 65, 65, 75);
+                }
+            }
+            const int phase = elapsed_ms % 4000;
+            const int pose = phase < 300 ? 0 : phase < 600 ? 1 : 2;
+            auto segment = [&](int ax, int ay, int bx, int by, bool hand) {
+                const int steps = std::max(std::abs(bx - ax), std::abs(by - ay));
+                for (int step = 0; step <= steps; ++step) {
+                    const int px = ax + (bx - ax) * step / std::max(1, steps);
+                    const int py = ay + (by - ay) * step / std::max(1, steps);
+                    for (int width = 0; width < 2; ++width)
+                        canvas->SetPixel(x + px + width, py + 4,
+                            hand ? 235 : 255, hand ? 177 : 255, hand ? 128 : 255);
+                }
+            };
+            for (int side = 0; side < 2; ++side) {
+                const bool sweep_out = (elapsed_ms / 350) % 2 == 0;
+                const int elbow_x = no_good ? (sweep_out ? 1 : 4) : pose == 0 ? 2 : 0;
+                const int elbow_y = no_good ? 10 : pose == 0 ? 12 : pose == 1 ? 8 : 6;
+                const int hand_y = no_good ? 9 : pose == 0 ? 16 : pose == 1 ? 4 : 0;
+                const auto mirror = [&](int px) { return side ? 11 - px : px; };
+                segment(mirror(4), 9, mirror(elbow_x), elbow_y, false);
+                if (no_good) {
+                    const int hand_x = sweep_out ? -2 : 6;
+                    segment(mirror(elbow_x), elbow_y, mirror(hand_x), hand_y, false);
+                    segment(mirror(hand_x), hand_y, mirror(hand_x), hand_y + 1, true);
+                } else {
+                    segment(mirror(elbow_x), elbow_y, mirror(elbow_x), hand_y + 2, false);
+                    segment(mirror(elbow_x), hand_y + 2, mirror(elbow_x), hand_y, true);
+                }
+            }
+        };
+        draw_referee(left);
+        draw_referee(right - 13);
+        left += 18;
+        right -= 18;
+    }
     const auto heading = event.team.abbr + "  " + event.label;
-    const auto& heading_font = getTextWidth(abbr_font, heading) <= display_width - left - 4 ? abbr_font : game_font;
-    center_text(heading_font, heading, left, display_width - 4, 14, color);
-    center_text(game_font, event.score, left, display_width - 4, 27, rgb_matrix::Color(255,255,255));
+    const auto& heading_font = getTextWidth(abbr_font, heading) <= right - left ? abbr_font : game_font;
+    center_text(heading_font, heading, left, right, 14, color);
+    center_text(game_font, event.score, left, right, 27, rgb_matrix::Color(255,255,255));
     canvas = matrix->SwapOnVSync(canvas);
 }
 

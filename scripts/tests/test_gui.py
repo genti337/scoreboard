@@ -63,7 +63,7 @@ class ControllerTests(unittest.TestCase):
 
     def test_celebrations_validate_and_launch(self):
         for bad in ({"celebration_team": ["nfl:BOGUS"]}, {"celebration_seconds": "0"},
-                    {"celebration_seconds": "301"}, {"celebration_preview": "../bad"}):
+                    {"celebration_seconds": "301"}, {"celebration_preview": "../bad"}, {"celebration_preview_kind": "invalid"}):
             self.assertEqual(self.post('/start', dict(mode="sports", NFL="1", **bad)).status_code, 400)
         child = Mock(pid=1234)
         child.poll.return_value = None
@@ -123,6 +123,17 @@ class ControllerTests(unittest.TestCase):
                     command = launch.call_args.args[0]
                     executable = command.index(str(self.gui.ROOT / 'RaspberryPI' / 'espn_jsonc'))
                     self.assertEqual(command[executable + 1:], expected)
+
+    def test_platform_launch_permissions(self):
+        executable = str(self.gui.ROOT / 'RaspberryPI' / 'espn_jsonc')
+        for platform, uid, prefix in [('darwin', 501, []), ('linux', 1000, ['sudo', '-n']), ('linux', 0, [])]:
+            with self.subTest(platform=platform, uid=uid):
+                self.gui.process = None
+                child = Mock()
+                child.wait.side_effect = subprocess.TimeoutExpired('display', .3)
+                with patch.object(self.gui.sys, 'platform', platform), patch.object(self.gui.os, 'geteuid', return_value=uid), patch.object(self.gui.subprocess, 'Popen', return_value=child) as launch:
+                    self.assertEqual(self.post('/start', {'NFL': '1'}).status_code, 200)
+                    self.assertEqual(launch.call_args.args[0], prefix + [executable, '--nfl'])
 
     def test_start_errors_are_reported(self):
         with patch.object(self.gui.subprocess, 'Popen', side_effect=FileNotFoundError('missing')):

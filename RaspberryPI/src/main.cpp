@@ -113,9 +113,26 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& cities,
                 std::string active_display,
                 std::string default_city,
-                std::set<std::string> celebration_teams) {
+                std::set<std::string> celebration_teams,
+                std::string celebration_preview, std::string celebration_preview_kind) {
     ScoringCelebrations scoring;
     std::string err;
+
+    if (!celebration_preview.empty()) {
+        try {
+            const auto colon = celebration_preview.find(':');
+            if (colon == std::string::npos) throw std::invalid_argument("Expected league:team for preview");
+            const auto league = celebration_preview.substr(0, colon);
+            const auto abbreviation = celebration_preview.substr(colon + 1);
+            FetchData fetcher("https://site.api.espn.com/apis/site/v2/sports/football/" +
+                              league + "/teams/" + abbreviation);
+            auto preview = previewCelebration(league, abbreviation, json::parse(fetcher.fetch()), celebration_preview_kind);
+            std::lock_guard<std::mutex> lock(shared_data.mutex);
+            shared_data.celebrations.push_back(std::move(preview));
+        } catch (const std::exception& error) {
+            std::cerr << "Unable to load preview team colors: " << error.what() << std::endl;
+        }
+    }
 
     while (running) {
         printf("Fetching Data!\n");
@@ -360,7 +377,9 @@ void display_loop(std::atomic<bool>& running,
                 celebration_end = now + std::chrono::seconds(celebration_seconds);
                 celebrating = true;
             }
-            if (!celebrations.empty()) display.drawCelebration(celebrations.front(), "../images/");
+            if (!celebrations.empty()) display.drawCelebration(celebrations.front(), "../images/",
+                std::chrono::duration_cast<std::chrono::milliseconds>(now - celebration_end +
+                    std::chrono::seconds(celebration_seconds)).count());
             else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
         }
 
@@ -398,6 +417,7 @@ int main(int argc, char* argv[]) {
     std::set<std::string> celebration_teams;
     int celebration_seconds = 30;
     std::string celebration_preview;
+    std::string celebration_preview_kind = "touchdown";
     bool scrolling = false;
     double scroll_speed = 20.0;
 
@@ -407,11 +427,12 @@ int main(int argc, char* argv[]) {
 
        std::cout << arg << std::endl;
 
-       if (arg == "--celebration-team" || arg == "--celebration-seconds" || arg == "--celebration-preview") {
+       if (arg == "--celebration-team" || arg == "--celebration-seconds" || arg == "--celebration-preview" || arg == "--celebration-preview-kind") {
            if (i + 1 >= argc) { std::cerr << arg << " requires a value\n"; return 1; }
            const std::string value = argv[++i];
            if (arg == "--celebration-team") celebration_teams.insert(value);
            else if (arg == "--celebration-preview") celebration_preview = value;
+           else if (arg == "--celebration-preview-kind") celebration_preview_kind = value;
            else {
                try {
                    size_t used = 0;
@@ -498,14 +519,6 @@ int main(int argc, char* argv[]) {
     CountdownDisplay countdown_display(32, 64, 5, "adafruit-hat", active_display == "countdown");
     countdown_display.set_sport(countdown_sport, countdown_league, countdown_team);
     DisplayData shared_data;
-    if (!celebration_preview.empty()) {
-        const auto colon = celebration_preview.find(':');
-        if (colon == std::string::npos) { std::cerr << "Expected league:team for preview\n"; return 1; }
-        Team team;
-        team.abbr = celebration_preview.substr(colon + 1);
-        team.color = "FFD700"; team.alt_color = "FFFFFF";
-        shared_data.celebrations.push_back({team, celebration_preview.substr(0, colon), "TOUCHDOWN!", "PREVIEW"});
-    }
     int weather_index = 0;
     std::vector<Team> rankings;
 
@@ -559,7 +572,7 @@ int main(int argc, char* argv[]) {
                             std::ref(leagues),
                             std::ref(cities),
                             active_display,
-                            default_city, celebration_teams);
+                            default_city, celebration_teams, celebration_preview, celebration_preview_kind);
 
 #ifdef MAC_STUB_MATRIX
     std::cout << "Close emulator window or press Esc to stop..." << std::endl;

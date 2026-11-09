@@ -41,6 +41,13 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 
 int main() {
     {
+        auto preview = previewCelebration("nfl", "DAL", {{"team", {{"color", "003594"}, {"alternateColor", "869397"}}}});
+        assert(preview.team.color == "003594" && preview.team.alt_color == "869397");
+        assert(preview.team.abbr == "DAL" && preview.label == "TOUCHDOWN!");
+        bool invalid_color = false;
+        try { previewCelebration("nfl", "DAL", {{"team", {{"color", "bad"}, {"alternateColor", "ffffff"}}}}); }
+        catch (const std::invalid_argument&) { invalid_color = true; }
+        assert(invalid_color);
         ScoringCelebrations scoring;
         auto game = fixture("football", "in");
         game.event_id = "game1";
@@ -71,6 +78,37 @@ int main() {
         summary["scoringPlays"].push_back(play);
         scoring.ingest(game, summary, selected);
         assert(scoring.pending.back().label == "FIELD GOAL GOOD");
+    }
+    {
+        ScoringCelebrations tracker;
+        auto game = fixture("football", "in"); game.event_id = "attempts";
+        const std::set<std::string> selected{"test:HOM"};
+        json summary = {{"scoringPlays", json::array()}, {"drives", {{"previous", json::array()},
+            {"current", {{"team", {{"id", "1"}}}, {"plays", json::array()}}}}}};
+        tracker.ingest(game, summary, selected);
+        json miss = {{"id", "miss1"}, {"type", {{"text", "Field Goal Missed"}}},
+                     {"text", "45 yard field goal is No Good"}, {"start", {{"team", {{"id", "1"}}}}}};
+        summary["drives"]["current"]["plays"].push_back(miss);
+        tracker.ingest(game, summary, selected);
+        assert(tracker.pending.size() == 1 && tracker.pending.back().label == "FIELD GOAL MISSED");
+        tracker.ingest(game, summary, selected);
+        assert(tracker.pending.size() == 1);
+        ScoringCelebrations startup; startup.ingest(game, summary, selected);
+        assert(startup.pending.empty());
+        miss["id"] = "blockedPAT"; miss["type"]["text"] = "Extra Point Blocked";
+        miss["text"] = "Extra point blocked";
+        summary["drives"]["current"]["plays"].push_back(miss);
+        tracker.ingest(game, summary, selected);
+        assert(tracker.pending.size() == 2 && tracker.pending.back().label == "PAT BLOCKED");
+        miss["id"] = "opponent"; miss["start"]["team"]["id"] = "2";
+        summary["drives"]["current"]["plays"].push_back(miss);
+        tracker.ingest(game, summary, selected);
+        assert(tracker.pending.size() == 2);
+        miss["id"] = "penalty"; miss["start"]["team"]["id"] = "1";
+        miss["text"] = "Extra point blocked, penalty, No Play";
+        summary["drives"]["current"]["plays"].push_back(miss);
+        tracker.ingest(game, summary, selected);
+        assert(tracker.pending.size() == 2);
     }
     ESPNParser parser;
     auto parse_clock = [&](const json& competition_status, const json& event_status) {
@@ -251,10 +289,30 @@ int main() {
     display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets);
     assert(std::any_of(rgb_matrix::g_emulator_pixels.begin(), rgb_matrix::g_emulator_pixels.end(),
                        [](uint8_t value) { return value != 0; }));
+    const auto arms_down = rgb_matrix::g_emulator_pixels;
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets, 450);
+    const auto arms_mid = rgb_matrix::g_emulator_pixels;
+    display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23"}, assets, 900);
+    assert(arms_down != arms_mid && arms_mid != rgb_matrix::g_emulator_pixels);
+    // Heading pixels stay steady as arms and confetti animate around them.
+    for (int y = 2; y <= 14; ++y)
+        for (int x = 40; x < 234; ++x)
+            for (int channel = 0; channel < 3; ++channel) {
+                const int pixel = (y * 256 + x) * 3 + channel;
+                assert(arms_down[pixel] == rgb_matrix::g_emulator_pixels[pixel]);
+            }
     Magick::Image celebration_image;
     celebration_image.read(256, 32, "RGB", Magick::CharPixel, rgb_matrix::g_emulator_pixels.data());
     celebration_image.resize(Magick::Geometry(1024, 128));
     celebration_image.write("/tmp/scoreboard-celebration.png");
+    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23"}, assets, 0);
+    const auto no_good_out = rgb_matrix::g_emulator_pixels;
+    display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23"}, assets, 350);
+    assert(no_good_out != rgb_matrix::g_emulator_pixels);
+    Magick::Image no_good_image;
+    no_good_image.read(256, 32, "RGB", Magick::CharPixel, no_good_out.data());
+    no_good_image.resize(Magick::Geometry(1024, 128));
+    no_good_image.write("/tmp/scoreboard-no-good.png");
     std::vector<Team> ranks;
     display.render_rankings(ranks, assets);
     Team team;
