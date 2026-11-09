@@ -2,6 +2,7 @@
 #define COMPETITION_HH
 
 #include <string>
+#include <ctime>
 #include <vector>
 #include <curl/curl.h>
 #include "Team.hh"
@@ -11,6 +12,7 @@ public:
     Competition();
     ~Competition();
 
+    std::time_t start_time = 0;
     std::string event_id;
     std::string sport;		// Competition Sport
     std::string league;		// Competition League

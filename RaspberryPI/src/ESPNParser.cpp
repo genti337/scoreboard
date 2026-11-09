@@ -2,6 +2,8 @@
 #include <iostream>
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
+#include <sstream>
 
 namespace {
 std::string optionalText(const nlohmann::json& object, const char* key) {
@@ -282,6 +284,10 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             {
                 auto iso = comp.at("date").get<std::string>();
                 std::tie(game.day, game.date, game.time) = convertToLocalTime(iso);
+                std::tm start = {};
+                std::istringstream timestamp(iso);
+                timestamp >> std::get_time(&start, "%Y-%m-%dT%H:%M:%S");
+                if (!timestamp.fail()) game.start_time = timegm(&start);
             }
 
             // Teams / competitors

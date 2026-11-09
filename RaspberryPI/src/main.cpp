@@ -5,6 +5,7 @@
 #include "../include/WeatherDisplay.hh"
 #include "../include/CountdownDisplay.hh"
 #include "../include/ScrollClock.hh"
+#include "../include/SportsPolling.hh"
 #include "../include/ProcessLifetime.hh"
 #include "../include/ScoringCelebrations.hh"
 
@@ -251,16 +252,13 @@ void fetch_loop(std::atomic<bool>& running,
                     scoring.pending.pop_front();
                 }
             }
-            const bool live_games = std::any_of(next_competitions->begin(), next_competitions->end(),
-                [](const Competition& game) { return !game.sports_logo_comp && game.state == "in"; });
+            const int poll_seconds = sportsPollSeconds(*next_competitions, std::time(nullptr), complete);
             if (complete) {
                 std::lock_guard<std::mutex> lock(shared_data.mutex);
                 shared_data.competitions = std::move(next_competitions);
             }
 
-            // Poll live scores more often; the display shows the reported clock
-            // rather than guessing whether the actual game clock is running.
-            const int poll_seconds = live_games ? 10 : 60;
+            std::cout << "Next sports update in " << poll_seconds << " seconds" << std::endl;
             for (int second = 0; second < poll_seconds && running; ++second)
                 std::this_thread::sleep_for(std::chrono::seconds(1));
         } else {

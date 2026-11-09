@@ -1,6 +1,7 @@
 // Headless regression checks for the Mac matrix stub. Run from RaspberryPI/.
 #include "../include/SportsDisplay.hh"
 #include "../include/ScrollClock.hh"
+#include "../include/SportsPolling.hh"
 #include "../include/ESPNParser.hh"
 #include "../include/FootballField.hh"
 #include <cassert>
@@ -40,6 +41,23 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 }
 
 int main() {
+    {
+        auto game = fixture("football", "pre");
+        game.start_time = 10000;
+        assert(sportsPollSeconds({game}, 1000) == 900);
+        assert(sportsPollSeconds({game}, 9700) == 240);
+        assert(sportsPollSeconds({game}, 9950) == 10);
+        assert(sportsPollSeconds({game}, 10010) == 60);
+        game.start_time = 0;
+        assert(sportsPollSeconds({game}, 1000) == 60);
+        game.state = "in";
+        assert(sportsPollSeconds({game}, 1000) == 10);
+        assert(sportsPollSeconds({game}, 1000, false) == 60);
+        game.state = "post";
+        assert(sportsPollSeconds({game}, 1000) == 900);
+        assert(sportsPollSeconds({}, 1000) == 900);
+    }
+
     {
         auto preview = previewCelebration("nfl", "DAL", {{"team", {{"color", "003594"}, {"alternateColor", "869397"}}}});
         assert(preview.team.color == "003594" && preview.team.alt_color == "869397");
