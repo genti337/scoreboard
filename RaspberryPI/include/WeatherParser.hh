@@ -18,6 +18,7 @@ public:
 
     std::pair<std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
     void parseWeather(const std::string& jsonStr, Weather& data);
+    void applyForecasts(const json& hourly, const json& daily, const json& extrema, Weather& data);
 
 private:
     std::string response;

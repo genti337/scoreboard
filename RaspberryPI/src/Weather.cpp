@@ -1,6 +1,8 @@
 #include "../include/Weather.hh"
 #include <iostream>
 #include <sstream>
+#include <iomanip>
+#include <cmath>
 
 // Constructor
 Weather::Weather() {
@@ -64,41 +66,44 @@ std::string Weather::extractPrecipitationPercent(const std::string& forecast) {
     return "0%";  // Return -1 if no percentage found
 }
 
-// Destructor
+namespace {
+Weather::period_struct readPeriod(Weather& weather, const json& j) {
+    Weather::period_struct period;
+    period.icon = j.value("icon", std::string{});
+    period.isDaytime = j.value("isDaytime", false);
+    period.name = j.value("name", std::string{});
+    period.start_time = j.at("startTime").get<std::string>();
+    period.time = weather.formatHourAmPm(period.start_time);
+    period.day = weather.getDayOfWeek(period.start_time);
+    period.temperature = "--";
+    if (j.contains("temperature") && j["temperature"].is_number()) {
+        double temperature = j["temperature"].get<double>();
+        if (j.value("temperatureUnit", std::string("F")) == "C") temperature = temperature * 1.8 + 32;
+        period.temperature = std::to_string(static_cast<int>(std::lround(temperature))) + "°";
+    }
+    period.precip_perc_str = "--";
+    if (j.contains("probabilityOfPrecipitation") && j["probabilityOfPrecipitation"].is_object()) {
+        const auto& pop = j["probabilityOfPrecipitation"];
+        if (pop.contains("value") && pop["value"].is_number()) {
+            const int value = static_cast<int>(std::lround(pop["value"].get<double>()));
+            if (value >= 0 && value <= 100) {
+                period.precip_perc = value;
+                period.precip_perc_str = std::to_string(value) + "%";
+            }
+        }
+    }
+    period.short_forecast = j.value("shortForecast", std::string{});
+    return period;
+}
+}
+
 void Weather::addHourlyPeriod(json j) {
-   period_struct period;
-
-   period.icon = j["icon"];
-   period.isDaytime = j["isDaytime"];
-   period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
-   period.time = formatHourAmPm(j["startTime"]);
-   period.day = getDayOfWeek(j["startTime"]);
-   period.start_time = j["startTime"];
-   period.isDaytime = sun_status.getSunPositionStatus(period.start_time, latitude, longitude);
-   period.precip_perc = j["probabilityOfPrecipitation"]["value"];
-   period.precip_perc_str = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
-   period.short_forecast = j["shortForecast"];
-
-   hourlyForecast.push_back(period);
-
-   return;
+    hourlyForecast.push_back(readPeriod(*this, j));
 }
 
 void Weather::addsevenDayPeriod(json j) {
-   period_struct period;
-
-   period.name = j["name"];
-   period.icon = j["icon"];
-   period.temperature = std::to_string(j["temperature"].get<int>()) + "°";
-   period.time = formatHourAmPm(j["startTime"]);
-   period.day = getDayOfWeek(j["startTime"]);
-   period.start_time = j["startTime"];
-   period.isDaytime = (period.name.find("Night") !=std::string::npos) == false;
-   period.precip_perc = j["probabilityOfPrecipitation"]["value"];
-   period.precip_perc_str = std::to_string(j["probabilityOfPrecipitation"]["value"].get<int>()) + "%";
-   period.short_forecast = j["shortForecast"];
-
-   sevenDayForecast.push_back(period);
-
-   return;
+    auto period = readPeriod(*this, j);
+    sevenDayForecast.push_back(period);
+    if (period.isDaytime) dailyForecast.push_back({period, "--"});
+    else if (!dailyForecast.empty()) dailyForecast.back().low = period.temperature;
 }

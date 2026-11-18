@@ -34,9 +34,12 @@ std::string FetchData::fetch() {
 
     curl_easy_setopt(curl, CURLOPT_URL, api_url.c_str());
 
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "curl/7.88.1");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Scoreboard/1.0 (local LED weather and sports display)");
 
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchData::writeCallback);
 

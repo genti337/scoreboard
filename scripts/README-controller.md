@@ -103,3 +103,17 @@ sudo ./espn_jsonc --weather_display --default-city "League City, TX" --city "Dal
 ```
 
 Rebuild with `make` after updating the C++ source, then restart the controller service and refresh Safari.
+
+## Weather sources and display
+
+The large temperature prefers a **nearby NWS station observation**. `OBS 15m` shows the reading’s age; an alternating label identifies the station and approximate distance in miles. The code tries the three nearest stations within 50 km (31 miles), accepting valid temperatures no more than 90 minutes old and rejecting explicitly questionable/erroneous/missing quality flags. If no usable reading is available, it falls back to the **NWS hourly forecast**; `FCST 1PM` identifies that forecast hour in the selected location’s local time; temperatures use Fahrenheit. The first card shows the observation (or forecast fallback) and today’s forecast calendar-day H/L. An observation icon is used when provided; a missing observation icon is left blank rather than substituting a forecast icon. The next cards show upcoming hours; daily cards show daytime forecasts with the following overnight low. Every five seconds the smaller cards rotate through rain probability, temperature/overnight low (`L`), and daytime high (`H`). A city stays on screen for all three pages.
+
+- **Hourly and daytime/overnight forecasts:** [National Weather Service](https://www.weather.gov/documentation/services-web-api), using the forecast grid returned for your coordinates.
+- **Today’s calendar-day high/low:** [Open-Meteo](https://open-meteo.com/en/docs), requested in Fahrenheit for one local day. These are model forecasts and may differ from NWS. They are not the range across the coming week or observed temperatures.
+- **Location:** an explicitly configured city is preferable to public-IP location, which can resolve to the ISP’s location. Include city and state for an unambiguous match. Coordinates are cached for the process lifetime; restart after changing network location when using automatic detection.
+
+Forecasts refresh every five minutes. Failed refreshes retry after 30 seconds and retain each location’s last successful forecast. `OLD` means that location has not refreshed successfully for more than 30 minutes; it describes fetch age, not the meteorological model’s issue time. Unknown temperatures/rain chances display `--`. An unavailable daily high/low source does not discard the NWS hourly forecast. Network requests have connection and overall timeouts.
+
+The review corrected a weekly-extremes bug in the old “today” H/L calculation, null precipitation handling, night/day pairing, clipped layouts, and ambiguous temperature labeling. A forecast provider change by itself does not demonstrate better accuracy. Nearby observations are optional and refresh with the forecast cycle. A missing station response does not discard the forecasts. Station readings can differ from conditions at your exact address, and NWS notes that quality-control processing can delay observations by about 20 minutes. Cached observations automatically stop displaying when they exceed the 90-minute age limit. Comparing stored forecasts against local observations over several weeks would be the useful way to judge provider accuracy for your location.
+
+Run the weather parser and headless layout checks on the Mac with `make -C RaspberryPI test-weather`.

@@ -2,6 +2,7 @@
 #define WEATHER_HH
 
 #include <string>
+#include <ctime>
 #include <vector>
 #include <curl/curl.h>
 #include <regex>
@@ -27,7 +28,7 @@ public:
         std::string forecast = "";
         std::string temperature = "";
         std::string icon = "";
-        int precip_perc = 0;
+        int precip_perc = -1;
         std::string precip_perc_str = "";
         std::string short_forecast = "";
         bool isDaytime=false;
@@ -47,11 +48,26 @@ public:
     std::vector<period_struct> hourlyForecast;
     std::vector<period_struct> sevenDayForecast;
 
-    int lowTemperature;
-    int highTemperature;
+    struct daily_struct {
+        period_struct daytime;
+        std::string low = "--";
+    };
+    std::vector<daily_struct> dailyForecast;
+    int lowTemperature = 0;
+    int highTemperature = 0;
+    bool hasDailyExtrema = false;
+    std::time_t fetched_at = 0;
+    int observed_temperature = 0;
+    std::time_t observed_at = 0;
+    std::string observation_station, observation_icon;
+    double station_distance_km = 0;
+    bool hasFreshObservation(std::time_t now) const {
+        const double age = std::difftime(now, observed_at);
+        return observed_at > 0 && age >= -300 && age <= 5400;
+    }
 
-    double latitude;
-    double longitude;
+    double latitude = 0;
+    double longitude = 0;
 
     SunStatus sun_status;
 

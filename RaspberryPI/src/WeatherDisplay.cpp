@@ -1,6 +1,7 @@
 #include "../include/WeatherDisplay.hh"
 #include <unistd.h>
 #include <iostream>
+#include <cmath>
 
 using namespace rgb_matrix;
 using namespace Magick;
@@ -34,7 +35,7 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
     weather_icon_map["rain_showers"] = "shower_rain";
     weather_icon_map["rain_showers_hi"] = "shower_rain";
     weather_icon_map["tsra"] = "storm";
-    weather_icon_map["tsra_sct"] = "rain";
+    weather_icon_map["tsra_sct"] = "storm";
     weather_icon_map["tsra_hi"] = "storm";
     weather_icon_map["tornado"] = "storm";
     weather_icon_map["hurricane"] = "storm";
@@ -42,8 +43,8 @@ WeatherDisplay::WeatherDisplay(int rows, int cols, int chain_length, const std::
     weather_icon_map["dust"] = "mist";
     weather_icon_map["smoke"] = "mist";
     weather_icon_map["haze"] = "mist";
-    weather_icon_map["hot"] = "hot";
-    weather_icon_map["cold"] = "cold";
+    weather_icon_map["hot"] = "sun";
+    weather_icon_map["cold"] = "snow";
     weather_icon_map["blizzard"] = "snow";
     weather_icon_map["fog"] = "mist";
 
@@ -79,16 +80,26 @@ void WeatherDisplay::drawWeatherIcon(const std::string& icon, bool is_daytime,
             if (qmark != std::string::npos)
                 conditions_part = conditions_part.substr(0, qmark);
 
-            // Extract first condition (before '/' or ',')
-            std::size_t delim = conditions_part.find_first_of("/,");
-            if (delim != std::string::npos)
-                condition = conditions_part.substr(0, delim);
-            else
-                condition = conditions_part;
+            // Dual-condition icons can change from sun to storms. Prefer the
+            // more consequential condition rather than always showing the first.
+            int best = -1;
+            std::istringstream parts(conditions_part);
+            std::string part;
+            while (std::getline(parts, part, '/')) {
+                const auto code = part.substr(0, part.find(','));
+                const auto mapped = weather_icon_map.find(code);
+                if (mapped == weather_icon_map.end()) continue;
+                const auto& value = mapped->second;
+                const int priority = value == "storm" ? 5 : value == "snow" ? 4 :
+                    value == "rain" || value == "shower_rain" ? 3 : value == "mist" ? 2 :
+                    value == "cloud" ? 1 : 0;
+                if (priority > best) { best = priority; condition = code; }
+            }
         }
     }
 
-    oss << time_of_day << "_" << weather_icon_map[condition] << ".bmp";
+    const auto known = weather_icon_map.find(condition);
+    oss << time_of_day << "_" << (known == weather_icon_map.end() ? "cloud" : known->second) << ".bmp";
     drawImage(oss.str(), offset_x, offset_y);
 }
 
@@ -99,91 +110,67 @@ int WeatherDisplay::draw(std::string city, std::vector<Weather>& weather_data, i
         return 0;
     }
     canvas->Clear();
-
-    // Display Update Index
-    if (update_index >= 2) {
-       update_index = 0;
-    } else {
-       update_index += 1;
+    update_index = (update_index + 1) % 3;
+    const auto& weather = weather_data[index];
+    const auto& first = weather.hourlyForecast.front();
+    const rgb_matrix::Color white(240, 240, 240), blue(95, 175, 255), warm(255, 150, 65);
+    const bool stale = weather.fetched_at > 0 && std::difftime(std::time(nullptr), weather.fetched_at) > 1800;
+    const int current_width = 88;
+    auto fit = [&](std::string label, int width) {
+        if (getTextWidth(small_font, label) <= width) return label;
+        while (!label.empty() && getTextWidth(small_font, label + "...") > width) label.pop_back();
+        return label + "...";
+    };
+    auto temperature = [](std::string value) {
+        const auto degree = value.find("°");
+        if (degree != std::string::npos) value.erase(degree);
+        return value;
+    };
+    draw_text(small_font, fit((stale ? "OLD " : "") + city, current_width - 3), 1, 6, stale ? warm : white);
+    const bool observed = weather.hasFreshObservation(std::time(nullptr));
+    const auto icon = observed ? weather.observation_icon : first.icon;
+    if (!icon.empty()) drawWeatherIcon(icon, observed ? icon.find("/night/") == std::string::npos : first.isDaytime, images_dir, 2, 10);
+    draw_text(temp_font, (observed ? std::to_string(weather.observed_temperature) : temperature(first.temperature)) + "F", 22, 25, white);
+    draw_text(small_font, "H" + (weather.hasDailyExtrema ? std::to_string(weather.highTemperature) : "--"), 60, 17, warm);
+    draw_text(small_font, "L" + (weather.hasDailyExtrema ? std::to_string(weather.lowTemperature) : "--"), 60, 25, blue);
+    std::string source = "FCST " + first.time;
+    if (observed) {
+        const int age = std::max(0, static_cast<int>(std::difftime(std::time(nullptr), weather.observed_at) / 60));
+        source = update_index == 1 ? "OBS " + weather.observation_station + " " +
+            std::to_string(static_cast<int>(std::lround(weather.station_distance_km / 1.609344))) + "mi" :
+            "OBS " + std::to_string(age) + "m";
     }
-
-    // Weather Index
-    if (update_index == 2) weather_index_out = (weather_index_out + 1) % int(weather_data.size());     
-
-    std::cout << "Index : " << weather_index_out << " : " << update_index << std::endl;
-
-    // Initialize X-Offset
-    int x_offset = 0;
-
-    // Reset the Max Display X-Offset
-    max_display_x = 0;
-
-    // Current Weather
-    draw_text(font, city, 0, 8, rgb_matrix::Color(255, 255, 255));
-    draw_text(temp_font, weather_data[index].hourlyForecast[0].temperature, 22, 26, rgb_matrix::Color(255, 255, 255));
-    draw_text(small_font, std::to_string(weather_data[index].lowTemperature) + "°", 52, 20, rgb_matrix::Color(0, 0, 255));
-    draw_text(small_font, std::to_string(weather_data[index].highTemperature) + "°", 52, 30, rgb_matrix::Color(255, 0, 0));
-
-    drawWeatherIcon(weather_data[index].hourlyForecast[0].icon, weather_data[index].hourlyForecast[0].isDaytime,
-                    images_dir, 0, 10);
-
-//    if (weather_data[index].hourlyForecast[0].precip_perc > 20) {
-        draw_text(small_font, weather_data[index].hourlyForecast[0].precip_perc_str, 4, 32, rgb_matrix::Color(100, 150, 230));
-//    }
-
-    // Hourly Forecast
-    x_offset = max_display_x + 8;
-    for (int i=1; i<5 && i<static_cast<int>(weather_data[index].hourlyForecast.size()); i++) {
-        draw_text(small_font, weather_data[index].hourlyForecast[i].time, x_offset, 6, rgb_matrix::Color(255, 255, 255));
-
-        drawWeatherIcon(weather_data[index].hourlyForecast[i].icon, weather_data[index].hourlyForecast[i].isDaytime,
-                        images_dir, x_offset, 8);
-
-        if (update_index == 0) {
-//            if (weather_data[index].hourlyForecast[i].precip_perc > 20) {
-                draw_text(small_font, weather_data[index].hourlyForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
-//            }
-        } else {
-            draw_text(small_font, weather_data[index].hourlyForecast[i].temperature, x_offset + 2, 32, rgb_matrix::Color(255, 255, 255));
-        }
-
-        // Increment the X-Offset
-        x_offset += 24;
+    draw_text(small_font, fit(source, current_width - 3), 1, 32, blue);
+    const int hourly_count = std::min(4, std::max(1, (display_width - current_width) / 48));
+    const int daily_start = current_width + hourly_count * 24 + 4;
+    for (int y = 0; y < 32; ++y) {
+        canvas->SetPixel(current_width - 2, y, 40, 50, 65);
+        canvas->SetPixel(daily_start - 3, y, 40, 50, 65);
     }
-
-    // Seven Day Forecast
-    x_offset = max_display_x + 32;
-    for (int i=0; i<10 && i<static_cast<int>(weather_data[index].sevenDayForecast.size()); i+=2) {
-        draw_text(small_font, weather_data[index].sevenDayForecast[i].day,
-                  x_offset, 6, rgb_matrix::Color(255, 255, 255));
-
-        drawWeatherIcon(weather_data[index].sevenDayForecast[i].icon, weather_data[index].sevenDayForecast[i].isDaytime,
-                        images_dir, x_offset, 8);
-
-        if (update_index == 0) {
-//            if (weather_data[index].sevenDayForecast[i].precip_perc > 20) {
-                draw_text(small_font, weather_data[index].sevenDayForecast[i].precip_perc_str, x_offset + 2, 32, rgb_matrix::Color(100, 150, 230));
-//            }
-        } else if (update_index == 1 && i+1<static_cast<int>(weather_data[index].sevenDayForecast.size())) {
-            draw_text(small_font, weather_data[index].sevenDayForecast[i+1].temperature, x_offset, 32, rgb_matrix::Color(0, 0, 255));
-        } else if (update_index == 2) {
-            draw_text(small_font, weather_data[index].sevenDayForecast[i].temperature, x_offset, 32, rgb_matrix::Color(255, 0, 0));
-        }
-
-        // Increment the X-Offset
-        x_offset += 24;
+    for (int i = 0; i < hourly_count && i + 1 < static_cast<int>(weather.hourlyForecast.size()); ++i) {
+        const auto& hour = weather.hourlyForecast[i + 1];
+        const int x = current_width + i * 24;
+        center_text(small_font, hour.time, x, x + 23, 6, white);
+        drawWeatherIcon(hour.icon, hour.isDaytime, images_dir, x + 3, 9);
+        center_text(small_font, update_index == 0 ? hour.precip_perc_str : temperature(hour.temperature),
+                    x, x + 23, 32, update_index == 0 ? blue : white);
     }
-
-    // Reset the First Pass Flag
-    first_pass = false;
-
-    // Save the Last Pass for the Weather Index
-    weather_index_lp = index;
-
+    // Each daily card is formed from an actual daytime period and its following
+    // overnight low, rather than guessing odd/even positions in the response.
+    for (int i = 0; i < static_cast<int>(weather.dailyForecast.size()); ++i) {
+        const int x = daily_start + i * 24;
+        if (x + 23 > display_width) break;
+        const auto& day = weather.dailyForecast[i];
+        center_text(small_font, day.daytime.day, x, x + 23, 6, white);
+        drawWeatherIcon(day.daytime.icon, true, images_dir, x + 3, 9);
+        const std::string value = update_index == 0 ? day.daytime.precip_perc_str :
+            update_index == 1 ? "L" + temperature(day.low) : "H" + temperature(day.daytime.temperature);
+        center_text(small_font, value, x, x + 23, 32, update_index == 0 ? blue : update_index == 1 ? blue : warm);
+    }
+    // Three five-second pages per city, starting with rain probability.
+    const int next_index = update_index == 2 ? (index + 1) % static_cast<int>(weather_data.size()) : index;
     canvas = matrix->SwapOnVSync(canvas);
-
-    // Output the Weather Index
-    return weather_index_out;
+    return next_index;
 }
 
 
@@ -191,7 +178,8 @@ void WeatherDisplay::draw_weather_text(std::string text) {
     // Clear the Canvas for Update
     canvas->Clear();
 
-    center_text(temp_font, text, 0, 5*64, 20);
+    const auto& message_font = getTextWidth(temp_font, text) <= display_width ? temp_font : font;
+    center_text(message_font, text, 0, display_width, 20);
 
     // Update the Canvas
     canvas = matrix->SwapOnVSync(canvas);

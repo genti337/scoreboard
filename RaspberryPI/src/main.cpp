@@ -116,6 +116,8 @@ void fetch_loop(std::atomic<bool>& running,
                 std::string default_city,
                 std::set<std::string> celebration_teams,
                 std::string celebration_preview, std::string celebration_preview_kind) {
+    std::map<std::string, Weather> last_weather;
+    std::map<std::string, std::pair<double, double>> weather_coordinates;
     ScoringCelebrations scoring;
     std::string err;
 
@@ -150,8 +152,13 @@ void fetch_loop(std::atomic<bool>& running,
             for (const auto& city : locations) {
                 try {
                     double lat, lon;
-                    if (!(city.empty() ? getCoordinatesFromLocation(lat, lon) : getCoordinatesFromCity(city, lat, lon))) {
-                        throw std::runtime_error("Unable to find city coordinates");
+                    const auto cached = weather_coordinates.find(city);
+                    if (cached != weather_coordinates.end()) {
+                        lat = cached->second.first; lon = cached->second.second;
+                    } else {
+                        if (!(city.empty() ? getCoordinatesFromLocation(lat, lon) : getCoordinatesFromCity(city, lat, lon)))
+                            throw std::runtime_error("Unable to find city coordinates");
+                        weather_coordinates[city] = {lat, lon};
                     }
                     std::ostringstream url;
                     url << "https://api.weather.gov/points/" << std::fixed
@@ -167,9 +174,12 @@ void fetch_loop(std::atomic<bool>& running,
                         forecast.city = city;
                         forecast.state.clear();
                     }
+                    last_weather[city] = forecast;
                     next_weather->push_back(std::move(forecast));
                 } catch (const std::exception& error) {
                     complete = false;
+                    const auto previous = last_weather.find(city);
+                    if (previous != last_weather.end()) next_weather->push_back(previous->second);
                     std::cerr << "Weather fetch failed for " << (city.empty() ? "current location" : city) << ": " << error.what() << std::endl;
                 }
             }

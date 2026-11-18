@@ -1,6 +1,9 @@
 #include "../include/WeatherParser.hh"
 #include <iostream>
 #include <sstream>
+#include <cmath>
+#include <stdexcept>
+#include "../include/WeatherObservation.hh"
 
 // Constructor
 WeatherParser::WeatherParser() {
@@ -63,73 +66,88 @@ std::pair<std::string, std::string> WeatherParser::convertToLocalTime(const std:
     return { date_str, std::string(time_buf) };
 }
 
-// Weather Parser
+// Parse fetched payloads independently so malformed/optional sources can be tested.
+void WeatherParser::applyForecasts(const json& hourly, const json& daily,
+                                  const json& extrema, Weather& data) {
+    data.hourlyForecast.clear();
+    data.sevenDayForecast.clear();
+    data.dailyForecast.clear();
+    data.hasDailyExtrema = false;
+    auto periods = [](const json& payload) -> json {
+        if (!payload.is_object() || !payload.contains("properties") || !payload["properties"].is_object()) return json::array();
+        const auto& properties = payload["properties"];
+        return properties.contains("periods") && properties["periods"].is_array() ? properties["periods"] : json::array();
+    };
+    for (const auto& period : periods(hourly)) {
+        try { data.addHourlyPeriod(period); } catch (const json::exception&) { continue; }
+        if (data.hourlyForecast.size() == 24) break;
+    }
+    if (data.hourlyForecast.empty()) throw std::runtime_error("NWS hourly forecast unavailable");
+    for (const auto& period : periods(daily)) {
+        try { data.addsevenDayPeriod(period); } catch (const json::exception&) { continue; }
+    }
+    // Open-Meteo returns one value per LOCAL calendar day, not a weekly range.
+    if (extrema.is_object() && extrema.contains("daily") && extrema["daily"].is_object()) {
+        const auto& values = extrema["daily"];
+        for (const char* key : {"temperature_2m_min", "temperature_2m_max"})
+            if (!values.contains(key) || !values[key].is_array() || values[key].empty() || !values[key][0].is_number()) return;
+        data.lowTemperature = static_cast<int>(std::lround(values["temperature_2m_min"][0].get<double>()));
+        data.highTemperature = static_cast<int>(std::lround(values["temperature_2m_max"][0].get<double>()));
+        data.hasDailyExtrema = data.lowTemperature <= data.highTemperature;
+    }
+}
+
 void WeatherParser::parseWeather(const std::string& jsonStr, Weather& data) {
-    json j = json::parse(jsonStr);
-    if (!j.contains("properties")) {
-        std::cerr << "Invalid response from NOAA points API." << std::endl;
-        return;
-    }
-
-    // LocationData
-    data.city = j["properties"]["relativeLocation"]["properties"]["city"];
-    data.state = j["properties"]["relativeLocation"]["properties"]["state"];
-    data.latitude = float(j["geometry"]["coordinates"][1]);
-    data.longitude = float(j["geometry"]["coordinates"][0]);
-
-    std::string forecast_url = j["properties"]["forecast"];
-    std::string hourly_url = j["properties"]["forecastHourly"];
-
-    // 7-day forecast
-    FetchData feather1(forecast_url); 
-    response = feather1.fetch();
-    auto forecast = json::parse(response, nullptr, false);
-    if (forecast.contains("properties")) {
-        for (const auto& period : forecast["properties"]["periods"]) {
-            // Skip if the period is for today
-            std::string period_name = period["name"];
-            if (period_name.find("Today") != std::string::npos) continue;
-            if (period_name.find("Tonight") != std::string::npos) continue;
-            if (period_name.find("This") != std::string::npos) continue;
-
-            data.addsevenDayPeriod(period);
+    const auto points = json::parse(jsonStr);
+    const auto& properties = points.at("properties");
+    data.city = properties.at("relativeLocation").at("properties").at("city").get<std::string>();
+    data.state = properties.at("relativeLocation").at("properties").at("state").get<std::string>();
+    data.latitude = points.at("geometry").at("coordinates").at(1).get<double>();
+    data.longitude = points.at("geometry").at("coordinates").at(0).get<double>();
+    FetchData daily_fetch(properties.at("forecast").get<std::string>());
+    const auto daily = json::parse(daily_fetch.fetch(), nullptr, false);
+    FetchData hourly_fetch(properties.at("forecastHourly").get<std::string>());
+    const auto hourly = json::parse(hourly_fetch.fetch(), nullptr, false);
+    std::ostringstream url;
+    url << "https://api.open-meteo.com/v1/forecast?latitude=" << data.latitude
+        << "&longitude=" << data.longitude
+        << "&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit"
+        << "&forecast_days=1&timezone=" << properties.at("timeZone").get<std::string>();
+    FetchData extrema_fetch(url.str());
+    const auto extrema = json::parse(extrema_fetch.fetch(), nullptr, false);
+    applyForecasts(hourly, daily, extrema, data);
+    data.fetched_at = std::time(nullptr);
+    // Observations are optional. A station outage must not discard forecasts.
+    data.observed_at = 0;
+    try {
+        if (!properties.contains("observationStations") || !properties["observationStations"].is_string()) return;
+        FetchData stations_fetch(properties["observationStations"].get<std::string>());
+        const auto stations = json::parse(stations_fetch.fetch());
+        std::vector<std::pair<double, std::string>> candidates;
+        for (const auto& station : stations.at("features")) {
+            try {
+                const auto& coordinates = station.at("geometry").at("coordinates");
+                const double distance = stationDistanceKm(data.latitude, data.longitude,
+                    coordinates.at(1).get<double>(), coordinates.at(0).get<double>());
+                const auto id = station.at("properties").at("stationIdentifier").get<std::string>();
+                if (distance <= 50 && !id.empty() && std::all_of(id.begin(), id.end(),
+                    [](unsigned char c) { return std::isalnum(c); })) candidates.emplace_back(distance, id);
+            } catch (const json::exception&) { continue; }
         }
-    }
-
-    // Current condition from hourly
-    FetchData fetcher2(hourly_url); 
-    response = fetcher2.fetch();
-    auto hourly = json::parse(response, nullptr, false);
-    std::cout << "Hourly URL : " << hourly_url << std::endl; 
-    if (hourly.contains("properties") && hourly["properties"]["periods"].size() > 0) {
-        for (const auto& period : hourly["properties"]["periods"]) {
-            data.addHourlyPeriod(period);
-
-            // Only Get Data for the Next 24 Hour Period
-            if (period["number"] >= 24) break;
+        std::sort(candidates.begin(), candidates.end());
+        for (size_t i = 0; i < std::min<size_t>(3, candidates.size()); ++i) {
+            try {
+                const auto& station = candidates[i];
+                FetchData observation_fetch("https://api.weather.gov/stations/" + station.second + "/observations/latest");
+                if (applyObservation(json::parse(observation_fetch.fetch()), station.second, station.first,
+                                     data, std::time(nullptr))) {
+                    std::cout << "Weather observation " << station.second << " at " << station.first
+                              << " km, age " << std::difftime(std::time(nullptr), data.observed_at) / 60 << " min" << std::endl;
+                    break;
+                }
+            } catch (const std::exception&) { continue; }
         }
+    } catch (const std::exception& error) {
+        std::cerr << "Station observations unavailable; using forecast: " << error.what() << std::endl;
     }
-
-    // Return High and Low Temperatures for Current Day
-    std::ostringstream high_low_url;
-    high_low_url << "https://api.open-meteo.com/v1/forecast"
-        << "?latitude=" << j["geometry"]["coordinates"][1]
-        << "&longitude=" << j["geometry"]["coordinates"][0]
-        << "&daily=temperature_2m_max,temperature_2m_min"
-        << "&timezone=" << j["properties"]["timeZone"].get<std::string>();
-
-    FetchData feather3(high_low_url.str()); 
-    response = feather3.fetch();
-    j = json::parse(response);
-
-    data.lowTemperature = 999;
-    data.highTemperature = -999;
-    for (int i=0; i<int(j["daily"]["temperature_2m_min"].size()); i++) {
-        if (j["daily"]["temperature_2m_min"][i] < data.lowTemperature) data.lowTemperature = j["daily"]["temperature_2m_min"][i]; // * (9/5) + 32;
-        if (j["daily"]["temperature_2m_max"][i] > data.highTemperature) data.highTemperature = j["daily"]["temperature_2m_max"][i]; // * (9/5) + 32;
-    }
-    data.lowTemperature = int(float(data.lowTemperature) * (9.0/5.0)) + 32;
-    data.highTemperature = int(float(data.highTemperature) * (9.0/5.0)) + 32;
-
-    return;
 }
