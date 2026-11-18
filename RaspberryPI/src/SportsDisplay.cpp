@@ -674,10 +674,8 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
     }
     const auto heading = event.team.abbr + "  " + event.label;
     const auto& heading_font = getTextWidth(abbr_font, heading) <= right - left ? abbr_font : game_font;
-    const bool has_detail = !event.score_detail.empty();
-    center_text(heading_font, heading, left, right, has_detail ? 12 : 14, color);
-    center_text(game_font, event.score, left, right, has_detail ? 22 : 27, rgb_matrix::Color(255,255,255));
-    if (has_detail) center_text(small_font, event.score_detail, left, right, 30, color);
+    center_text(heading_font, heading, left, right, 14, color);
+    center_text(game_font, event.score, left, right, 27, rgb_matrix::Color(255,255,255));
     canvas = matrix->SwapOnVSync(canvas);
 }
 
