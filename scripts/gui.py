@@ -7,6 +7,7 @@ import os
 import sys
 from pathlib import Path
 import secrets
+import shlex
 import signal
 import threading
 from functools import wraps
@@ -333,7 +334,9 @@ HTML = """
     function collectSettings() {
       const fields = {};
       document.querySelectorAll("input[id], select[id]").forEach(el => {
-        if (el.id !== "city-input") fields[el.id] = el.type === "checkbox" ? el.checked : el.value;
+        // Celebration checkboxes default to unchecked when the page loads.
+        if (el.id === "city-input" || (el.hasAttribute("data-celebration") && !el.checked)) return;
+        fields[el.id] = el.type === "checkbox" ? el.checked : el.value;
       });
       return {fields, cities: cityList, countdown: [countdown_sport, countdown_league, countdown_team, countdown_abbr]};
     }
@@ -911,12 +914,12 @@ def start_app():
             else:
                 cmd += ["--conference", conf_entry]
 
-        print("Mode : " + mode)
-        print(cmd)
-        print(args)
+        display_dir = ROOT / "RaspberryPI"
+        print(f"Launching display (uid={os.geteuid()}): "
+              f"cd {shlex.quote(str(display_dir))} && {shlex.join(cmd)}", flush=True)
 
         try:
-            process = subprocess.Popen(cmd, cwd=ROOT / "RaspberryPI", start_new_session=True)
+            process = subprocess.Popen(cmd, cwd=display_dir, start_new_session=True)
             try:
                 code = process.wait(timeout=0.3)
                 return jsonify(running=False, error=f"Display exited at startup (code {code}). Check the controller log."), 500
