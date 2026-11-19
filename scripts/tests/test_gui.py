@@ -100,6 +100,7 @@ class ControllerTests(unittest.TestCase):
 
     def test_modes_build_expected_arguments(self):
         cases = [
+            ({'mode': 'sports', 'NFL': '1', 'live_only': '1'}, ['--live-only', '--nfl']),
             ({'mode': 'weather'}, ['--weather_display']),
             ({'mode': 'weather', 'default_city': 'League City, TX', 'city': ['Dallas, TX']},
              ['--weather_display', '--default-city', 'League City, TX', '--city', 'Dallas, TX']),

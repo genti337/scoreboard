@@ -97,6 +97,7 @@ HTML = """
 
   <div id="sports-wrapper">
     <label><input type="checkbox" id="scrolling"> Scroll scores</label>
+    <label><input type="checkbox" id="live-only"> Only show live games</label>
     <div class="section-label">Sports</div>
     <div class="checkbox-group">
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
@@ -386,7 +387,7 @@ HTML = """
         const nfl = document.getElementById("nfl").checked ? "NFL=1&" : "";
 
         const mode = document.getElementById("display-mode").value;
-        const modeArg = "mode=" + mode + (mode === "sports" && document.getElementById("scrolling").checked ? "&scrolling=1" : "");
+        const modeArg = "mode=" + mode + (mode === "sports" && document.getElementById("scrolling").checked ? "&scrolling=1" : "") + (mode === "sports" && document.getElementById("live-only").checked ? "&live_only=1" : "");
 
         let ncaafRankings = "";
         let ncaabRankings = "";
@@ -822,6 +823,8 @@ def start_app():
         if mode == "sports":
             if args.get("scrolling") == "1":
                 cmd.append("--scrolling")
+            if args.get("live_only") == "1":
+                cmd.append("--live-only")
             if mlb:
                 cmd.append("--mlb")
             if nba:

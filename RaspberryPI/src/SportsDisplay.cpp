@@ -711,6 +711,12 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
     ranking.game_display_width = max_display_x - x_init;
 }
 
+void SportsDisplay::drawMessage(const std::string& message) {
+    canvas->Clear();
+    center_text_vertically(font, message, 0, display_width, 0, canvas->height(), rgb_matrix::Color(255, 255, 255));
+    canvas = matrix->SwapOnVSync(canvas);
+}
+
 void SportsDisplay::invalidateCards(bool reset_layout) {
     competition_cards.clear();
     data_changed = true;
@@ -778,7 +784,8 @@ const SportsDisplay::Card& SportsDisplay::competitionCard(std::vector<Competitio
 
         render_target = nullptr;
         Card card;
-        card.width = std::max(1, competitions[index].game_display_width);
+        card.width = std::max({1, competitions[index].game_display_width,
+                               static_cast<int>(raster.pixels.size()) / canvas->height()});
         raster.pixels.resize(std::max(raster.pixels.size(), static_cast<size_t>(card.width * canvas->height())), Display::Pixel{0, 0, 0});
         card.pixels = std::move(raster.pixels);
         found = competition_cards.emplace(index, std::move(card)).first;
@@ -828,19 +835,27 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
         // Clear the Canvas for Update
         canvas->Clear();
 
-        // Draw the Competitions
-        for (int i=0; i<4; i++) {
-           // Initialize Competition Indices
-           if (first_pass) {
-               competition_index[i] = (competition_index[i]) % num_comp_display;
-           }
-    
-           if (first_pass && i > 0)
-               x_init[i] = x_init[i-1] + competitions[competition_index[i-1]].game_display_width + competition_space;
-           const auto& card = competitionCard(competitions, competition_index[i], images_dir);
-           drawCard(card, x_init[i]);
-
+        // Rebuild every visible slot before laying them out: live updates can
+        // widen scores or situation text while the ticker is already moving.
+        for (int i = 0; i < 4; ++i) {
+            if (first_pass) competition_index[i] %= num_comp_display;
+            competitionCard(competitions, competition_index[i], images_dir);
         }
+        if (first_pass) {
+            for (int i = 1; i < 4; ++i)
+                x_init[i] = x_init[i - 1] + competitions[competition_index[i - 1]].game_display_width + competition_space;
+        } else if (data_changed) {
+            // Slot numbers rotate after wrapping. Preserve the leftmost card's
+            // position and reflow its successors in their actual screen order.
+            std::vector<int> order{0, 1, 2, 3};
+            std::sort(order.begin(), order.end(), [&](int a, int b) { return x_init[a] < x_init[b]; });
+            for (size_t i = 1; i < order.size(); ++i) {
+                const int previous = order[i - 1], current = order[i];
+                x_init[current] = x_init[previous] + competitions[competition_index[previous]].game_display_width + competition_space;
+            }
+        }
+        for (int i = 0; i < 4; ++i)
+            drawCard(competitionCard(competitions, competition_index[i], images_dir), x_init[i]);
 
         // Advance all slots together. Handle every wrap even when a slow frame
         // requires multiple pixels, without presenting intermediate frames.

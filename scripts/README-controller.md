@@ -21,7 +21,7 @@ On macOS, the controller launches the emulator directly without `sudo`. Run the 
 
 Open the controller directly in Safari; no username or password is required. Devices that can reach the Pi on your LAN can control the display. CSRF protection remains enabled, and state-changing requests still require POST.
 
-In Sports mode, enable **Scroll scores** for scrolling instead of the static layout. The selection is saved with the other settings and applies the next time you start the display. Rankings scroll automatically.
+In Sports mode, enable **Scroll scores** for scrolling instead of the static layout. The selection is saved with the other settings and applies the next time you start the display. Rankings scroll automatically. Enable **Only show live games** to hide upcoming and finished games in Sports mode (static or scrolling). If none of the selected games are live, the board displays “No live games” and keeps checking the full schedule for upcoming starts. Stop and Start to apply changes. Direct launches can use `--live-only`, for example `./espn_jsonc --nfl --scrolling --live-only`.
 
 Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that interface. The default remains `0.0.0.0`, matching the original setup. Reserve the Pi's IP in your router for a stable bookmark.
 

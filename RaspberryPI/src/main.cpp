@@ -290,7 +290,7 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Team>& rankings,
                   std::vector<std::string>& cities,
                   std::string active_display,
-                  double scroll_speed, int celebration_seconds) {
+                  double scroll_speed, int celebration_seconds, bool live_only) {
     printf("Updating Display!\n");
 
 #ifdef MAC_STUB_MATRIX
@@ -343,9 +343,14 @@ void display_loop(std::atomic<bool>& running,
             }
         }
         if (scores != previous_competitions) {
-            const bool reset_layout = !previous_competitions ||
-                !scores || competitions.size() != scores->size();
-            competitions = scores ? *scores : std::vector<Competition>{};
+            auto next = scores ? (live_only ? liveCompetitions(*scores) : *scores) : std::vector<Competition>{};
+            bool reset_layout = !previous_competitions || competitions.size() != next.size();
+            if (!reset_layout) {
+                for (size_t i = 0; i < next.size(); ++i)
+                    if (next[i].event_id != competitions[i].event_id || next[i].league != competitions[i].league)
+                        reset_layout = true;
+            }
+            competitions = std::move(next);
             previous_competitions = scores;
             display.invalidateCards(reset_layout);
         }
@@ -389,6 +394,7 @@ void display_loop(std::atomic<bool>& running,
                 std::chrono::duration_cast<std::chrono::milliseconds>(now - celebration_end +
                     std::chrono::seconds(celebration_seconds)).count());
             else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
+            else if (live_only) display.drawMessage(scores ? "No live games" : "Fetching scores...");
         }
 
         // Rendering and VSync waiting count toward the 25 ms frame budget.
@@ -426,6 +432,7 @@ int main(int argc, char* argv[]) {
     int celebration_seconds = 30;
     std::string celebration_preview;
     std::string celebration_preview_kind = "touchdown";
+    bool live_only = false;
     bool scrolling = false;
     double scroll_speed = 20.0;
 
@@ -507,6 +514,8 @@ int main(int argc, char* argv[]) {
                std::cerr << "--scroll-speed must be greater than 0 and at most 1000 pixels/second\n";
                return 1;
            }
+       } else if (arg == "--live-only") {
+          live_only = true;
        } else if (arg == "--scrolling") {
           scrolling = true;
        }
@@ -567,7 +576,7 @@ int main(int argc, char* argv[]) {
                               std::ref(rankings),
                               std::ref(cities),
                               active_display,
-                              scroll_speed, celebration_seconds);
+                              scroll_speed, celebration_seconds, live_only);
 
     // Data Loop Thread
     std::thread fetchThread(fetch_loop,

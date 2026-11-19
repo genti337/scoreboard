@@ -43,6 +43,13 @@ void drawDirect(SportsDisplay& d, Competition& c, int x) {
 int main() {
     {
         auto game = fixture("football", "pre");
+        auto active = fixture("football", "in");
+        auto final_game = fixture("football", "post");
+        auto logo = active; logo.sports_logo_comp = true;
+        auto other_logo = logo; other_logo.league = "other";
+        auto filtered = liveCompetitions({logo, game, active, final_game, other_logo});
+        assert(filtered.size() == 2 && filtered[0].sports_logo_comp && filtered[1].state == "in");
+        assert(liveCompetitions({game, final_game, logo}).empty());
         game.start_time = 10000;
         assert(sportsPollSeconds({game}, 1000) == 900);
         assert(sportsPollSeconds({game}, 9700) == 240);
@@ -420,6 +427,38 @@ int main() {
     narrow.clock = "12:34";
     display.draw_football(narrow, 0, assets);
     assert(narrow.game_display_width > narrow_width);
+    // Width-changing live refreshes must reflow neighboring scrolling cards.
+    {
+        SportsDisplay ticker(32, 64, 4, "regular", true, true);
+        SportsDisplay expected(32, 64, 4, "regular", true, true);
+        auto changing = fixture("football", "in");
+        changing.AwayTeam.score = changing.HomeTeam.score = "9";
+        changing.down_dist = "1st & 1"; changing.possession_text = "AWY 1";
+        std::vector<Competition> games{changing};
+        ticker.draw(games, assets, 256); // Anchor first card at x = 0.
+        const int before = games[0].game_display_width;
+        games[0].HomeTeam.score = "10";
+        games[0].down_dist = "4th & 99";
+        games[0].possession_text = "AWY 49";
+        ticker.invalidateCards();
+        ticker.draw(games, assets, 0);
+        const int wider = games[0].game_display_width;
+        assert(wider > before);
+        expected.canvas->Clear();
+        for (int slot = 0; slot < 4; ++slot) drawDirect(expected, games[0], slot * (wider + 20));
+        assert(ticker.canvas->pixels() == expected.canvas->pixels());
+        // After a wrap, the first physical slot is no longer the leftmost.
+        ticker.draw(games, assets, wider + 20);
+        games[0].HomeTeam.score = "7";
+        games[0].down_dist = "1st & 1"; games[0].possession_text = "AWY 1";
+        ticker.invalidateCards();
+        ticker.draw(games, assets, 0);
+        const int smaller = games[0].game_display_width;
+        assert(smaller < wider);
+        expected.canvas->Clear();
+        for (int slot = 0; slot < 4; ++slot) drawDirect(expected, games[0], slot * (smaller + 20));
+        assert(ticker.canvas->pixels() == expected.canvas->pixels());
+    }
     // A cached bitmap remains available after its original file disappears.
     display.drawImage((assets + "cache.bmp").c_str(), 0, 0);
     const auto count = display.image_cache.size();

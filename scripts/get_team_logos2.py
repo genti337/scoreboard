@@ -3,17 +3,18 @@
 General ESPN logo fetcher -> 32px-tall, stride-safe BMPs saved as ABBREV.bmp.
 
 - Works for NFL, MLB, NCAAF, etc. via --sport and --league.
-- Uses ESPN teams API to list teams, chooses the *smallest-width* logo from team['logos'].
-- Crops transparent & near-black borders.
+- Uses ESPN's dark-background artwork for Ohio State and for teams selected with --dark-background.
+- Crops transparent borders, or near-black padding on opaque artwork.
 - Resizes to height=32 px, preserves aspect ratio.
 - Caps final width to 48 px if needed (proportionally).
 - Pads width so BMP row stride is naturally aligned (naive BMP readers safe).
 - Saves as TEAM_ABBREV.bmp (e.g., BAL.bmp, NYY.bmp, NEB.bmp).
 
 Examples:
-  NFL:  python get_team_logos.py --sport football --league nfl
-  MLB:  python get_team_logos.py --sport baseball --league mlb
-  NCAAF:python get_team_logos.py --sport football --league college-football
+  NFL:  python scripts/get_team_logos2.py --sport football --league nfl
+  MLB:  python scripts/get_team_logos2.py --sport baseball --league mlb
+  NCAAF:python scripts/get_team_logos2.py --sport football --league college-football
+  Ohio State: python scripts/get_team_logos2.py --league college-football --teams OSU --out images/college-football
   Subset: --teams BAL,KC,NEB,NYY
 """
 
@@ -21,6 +22,7 @@ import os, io, argparse, requests
 from PIL import Image, ImageChops
 
 TEAMS_URL_TMPL = "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams?limit=500"
+DARK_BACKGROUND_TEAMS = {("football", "college-football", "OSU")}
 
 def fetch_teams_index(sport: str, league: str):
     url = TEAMS_URL_TMPL.format(sport=sport, league=league)
@@ -37,9 +39,13 @@ def iter_team_objs(teams_index_json):
                 if team:
                     yield team
 
-def pick_smallest_logo_url(team_obj):
-    """Pick logo with smallest width from team['logos']."""
-    logos = team_obj.get("logos") or []
+def pick_smallest_logo_url(team_obj, dark_background=False):
+    """Prefer dark-background variants when requested, then compare dimensions."""
+    logos = [logo for logo in (team_obj.get("logos") or []) if logo.get("href")]
+    if dark_background:
+        dark_labels = {"dark", "primary_logo_on_black_color"}
+        dark_logos = [logo for logo in logos if dark_labels.intersection(logo.get("rel") or [])]
+        logos = dark_logos or logos
     if not logos:
         return None
     logos_sorted = sorted(
@@ -58,10 +64,9 @@ def crop_transparent_and_near_black(img: Image.Image, near_black_tol=8) -> Image
     if img.mode != "RGBA":
         img = img.convert("RGBA")
     alpha = img.split()[-1]
-    bbox = alpha.getbbox()
-    if bbox:
-        img = img.crop(bbox)
-        alpha = img.split()[-1]
+    if alpha.getextrema()[0] < 255:
+        bbox = alpha.getbbox()
+        return img.crop(bbox) if bbox else img
     # 2) Trim near-black padding
     rgb = img.convert("RGB")
     black = Image.new("RGB", rgb.size, (0, 0, 0))
@@ -70,10 +75,9 @@ def crop_transparent_and_near_black(img: Image.Image, near_black_tol=8) -> Image
     r, g, b = diff.split()
     r = r.point(thresh); g = g.point(thresh); b = b.point(thresh)
     non_black = ImageChops.lighter(ImageChops.lighter(r, g), b)
-    nb_mask = ImageChops.multiply(non_black.convert("L"), alpha)
-    bbox2 = nb_mask.getbbox()
-    if bbox2:
-        img = img.crop(bbox2)
+    bbox = non_black.getbbox()
+    if bbox:
+        img = img.crop(bbox)
     return img
 
 def resize_to_height(img: Image.Image, target_h=32) -> Image.Image:
@@ -124,6 +128,8 @@ def main():
     ap.add_argument("--height", type=int, default=32, help="Target pixel height")
     ap.add_argument("--max-width", type=int, default=48, help="Cap final width (px)")
     ap.add_argument("--black-tol", type=int, default=8, help="Near-black trim tolerance")
+    ap.add_argument("--dark-background", action="store_true",
+                    help="Prefer ESPN artwork designed for black backgrounds for all selected teams.")
     ap.add_argument("--bpp", type=int, default=24, choices=[24,32], help="BMP bits per pixel")
     ap.add_argument("--force-square", action="store_true",
                     help="Pad to height×height after resize (before width cap).")
@@ -147,7 +153,8 @@ def main():
             continue
 
         try:
-            logo_url = pick_smallest_logo_url(team)
+            dark_background = args.dark_background or (args.sport, args.league, abbr) in DARK_BACKGROUND_TEAMS
+            logo_url = pick_smallest_logo_url(team, dark_background=dark_background)
             if not logo_url:
                 print(f"✗ {abbr} no logos[] URL found; skipping")
                 continue
@@ -157,10 +164,10 @@ def main():
             img = resize_to_height(img, target_h=args.height)
 
             if args.force_square:
-                # center into exact HxH canvas before final width cap
+                img = cap_final_width(img, max_w=args.height)
                 w, h = img.size
                 canvas = Image.new("RGBA", (args.height, args.height), (0,0,0,0))
-                canvas.paste(img, ((args.height - w)//2, 0))
+                canvas.paste(img, ((args.height - w)//2, (args.height - h)//2))
                 img = canvas
 
             # Cap the final width

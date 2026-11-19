@@ -20,3 +20,16 @@ inline int sportsPollSeconds(const std::vector<Competition>& games,
     }
     return wait;
 }
+
+// Keep league separators only when that league has a live game to display.
+inline std::vector<Competition> liveCompetitions(const std::vector<Competition>& games) {
+    std::vector<Competition> result;
+    for (const auto& game : games) {
+        if (!game.sports_logo_comp && game.state == "in") result.push_back(game);
+        else if (game.sports_logo_comp && std::any_of(games.begin(), games.end(), [&](const Competition& candidate) {
+            return !candidate.sports_logo_comp && candidate.state == "in" &&
+                candidate.sport == game.sport && candidate.league == game.league;
+        })) result.push_back(game);
+    }
+    return result;
+}

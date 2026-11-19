@@ -34,6 +34,7 @@ public:
     void DrawCanvas(rgb_matrix::FrameCanvas* src, rgb_matrix::FrameCanvas* dst, int offset_x, int offset_y);
     void draw(std::vector<Competition>& competitions, const std::string& images_dir, int scroll_pixels = 1);
     void invalidateCards(bool reset_layout = false);
+    void drawMessage(const std::string& message);
     void render_rankings(std::vector<Team>& rankings, const std::string& images_dir, int scroll_pixels = 1);
 
 private:
