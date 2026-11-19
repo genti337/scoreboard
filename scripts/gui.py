@@ -13,6 +13,7 @@ from functools import wraps
 import requests
 import pytz
 from datetime import datetime, timezone
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,18 @@ def response_headers(response):
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    return response
+
+
+@app.errorhandler(HTTPException)
+def controller_http_error(error):
+    response = error.get_response()
+    if request.path != "/":
+        message = f"{error.name} (HTTP {error.code})."
+        if error.code >= 500:
+            message += " Check the controller log."
+        response.set_data(app.json.dumps({"error": message}))
+        response.mimetype = "application/json"
     return response
 
 
@@ -230,6 +243,10 @@ HTML = """
         ...options,
         headers: {"Content-Type": "application/json", "X-CSRF-Token": csrfToken, ...options.headers}
       });
+      const contentType = response.headers.get("Content-Type") || "";
+      if (!contentType.toLowerCase().startsWith("application/json")) {
+        throw new Error(`Controller request ${path} returned an unexpected response (HTTP ${response.status}). Check the controller URL and service log.`);
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Request failed. Reload and try again.");
       return data;
@@ -484,8 +501,7 @@ HTML = """
     }
 
     function updateTemp() {
-      fetch("/temperature")
-        .then(res => res.json())
+      api("/temperature")
         .then(data => {
           document.getElementById("temp").textContent = "Temperature: " + data.temp_f + "°F";
         })
@@ -628,9 +644,8 @@ HTML = """
       eventInput.value = eventName;
 
       try {
-        const response = await fetch('/get_game_time', {
+        const data = await api('/get_game_time', {
           method: 'POST',
-          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
           body: JSON.stringify({
             team: team,
             abbr: abbr,
@@ -639,9 +654,7 @@ HTML = """
           })
         });
 
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
+        if (!data.success) {
           throw new Error(data.error || "Unable to find upcoming game.");
         }
 

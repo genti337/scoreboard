@@ -47,6 +47,22 @@ class ControllerTests(unittest.TestCase):
         self.assertIn('document.createTextNode(city', response.text)
         Path(self.state.name, 'rendered.html').write_text(response.text)
 
+    def test_api_http_errors_return_json(self):
+        response = self.client.get('/start')
+        self.assertEqual(response.status_code, 405)
+        self.assertIn('POST', response.headers['Allow'])
+        self.assertIn('HTTP 405', response.json['error'])
+        self.assertEqual(self.client.get('/missing').status_code, 404)
+        self.assertIn('HTTP 404', self.client.get('/missing').json['error'])
+
+    def test_api_unexpected_error_returns_json_and_logs_exception(self):
+        self.gui.process = Mock()
+        self.gui.process.poll.side_effect = RuntimeError('test error')
+        with patch.dict(self.gui.app.config, PROPAGATE_EXCEPTIONS=False), self.assertLogs(self.gui.app.logger):
+            response = self.client.get('/status')
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json, {'error': 'Internal Server Error (HTTP 500). Check the controller log.'})
+
     def test_settings_persist_and_validate(self):
         settings = {'fields': {'mlb': True, 'default-city': 'League City, TX'}, 'cities': ["O'Fallon"], 'countdown': ['', '', '', '']}
         self.assertEqual(self.post('/settings', settings).status_code, 200)
