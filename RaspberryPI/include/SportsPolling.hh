@@ -21,6 +21,31 @@ inline int sportsPollSeconds(const std::vector<Competition>& games,
     return wait;
 }
 
+// Schedule entries follow their league separator. Prefer a live game, then
+// the next scheduled game, and keep the latest result when the season is over.
+inline void appendSchoolScheduleGame(const std::vector<Competition>& schedule,
+                                     std::vector<Competition>& games) {
+    if (schedule.size() < 2) return;
+    const Competition* live = nullptr;
+    const Competition* upcoming = nullptr;
+    const Competition* latest = nullptr;
+    for (auto game = schedule.begin() + 1; game != schedule.end(); ++game) {
+        if (game->state == "in") {
+            live = &*game;
+            break;
+        }
+        if (game->state == "pre" && (!upcoming || game->start_time < upcoming->start_time))
+            upcoming = &*game;
+        if (game->state == "post" && (!latest || game->start_time > latest->start_time))
+            latest = &*game;
+    }
+    const auto* selected = live ? live : upcoming ? upcoming : latest;
+    if (selected) {
+        games.push_back(schedule.front());
+        games.push_back(*selected);
+    }
+}
+
 // Keep league separators only when that league has a live game to display.
 inline std::vector<Competition> liveCompetitions(const std::vector<Competition>& games) {
     std::vector<Competition> result;

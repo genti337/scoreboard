@@ -104,6 +104,20 @@ struct DisplayData {
     std::shared_ptr<const std::vector<Weather>> weather;
 };
 
+static std::string findSchoolTeamId(const std::string& league_url, const std::string& school_team) {
+    FetchData fetcher(league_url + "/teams?limit=1000");
+    const auto index = json::parse(fetcher.fetch());
+    for (const auto& sport : index.at("sports")) {
+        for (const auto& league : sport.at("leagues")) {
+            for (const auto& entry : league.at("teams")) {
+                const auto& team = entry.at("team");
+                if (team.value("abbreviation", "") == school_team) return team.at("id").get<std::string>();
+            }
+        }
+    }
+    return {};
+}
+
 void fetch_loop(std::atomic<bool>& running, 
                 ESPNParser& parser, 
                 WeatherParser& weather_parser, 
@@ -114,11 +128,13 @@ void fetch_loop(std::atomic<bool>& running,
                 std::vector<std::string>& cities,
                 std::string active_display,
                 std::string default_city,
+                std::string school_team,
                 std::set<std::string> celebration_teams,
                 std::string celebration_preview, std::string celebration_preview_kind) {
     std::map<std::string, Weather> last_weather;
     std::map<std::string, std::pair<double, double>> weather_coordinates;
     ScoringCelebrations scoring;
+    std::map<std::string, std::string> school_team_ids;
     std::string err;
 
     if (!celebration_preview.empty()) {
@@ -199,10 +215,10 @@ void fetch_loop(std::atomic<bool>& running,
 
             // Loop through Sports
             for (int i=0; i<int(sports.size()); i++) {
+               const auto league_url = "https://site.api.espn.com/apis/site/v2/sports/" + sports[i] + "/" + leagues[i];
                std::ostringstream url;
 
-               url << "https://site.api.espn.com/apis/site/v2/sports/" << sports[i]
-                   << "/" << leagues[i] << "/scoreboard";
+               url << league_url << "/scoreboard";
                if (leagues[i] == "college-football") {
                    // Read the season and week together. The season year can
                    // differ from the calendar year during January bowl games.
@@ -224,6 +240,8 @@ void fetch_loop(std::atomic<bool>& running,
                    }
                    // Postseason or unavailable metadata uses the current feed
                    // without forcing a regular-season year or week.
+               } else if (!school_team.empty()) {
+                   url << (leagues[i] == "mens-college-basketball" ? "?groups=50&limit=500" : "?limit=500");
                }
 
 	       std::cout << url.str() << std::endl;
@@ -233,13 +251,29 @@ void fetch_loop(std::atomic<bool>& running,
                printf("Fetched data for %s %s\n", sports[i].c_str(), leagues[i].c_str());
 	       std::cout << "URL: " << url.str() << std::endl;
    
-               if (!data.empty()) {
-                   if (!parser.parseESPNScoreboard(data, *next_competitions, sports[i], leagues[i], conferences, &err)) {
-                       complete = false;
-                   }
-               } else {
+               const auto previous_size = next_competitions->size();
+               const bool parsed = !data.empty() &&
+                   parser.parseESPNScoreboard(data, *next_competitions, sports[i], leagues[i], conferences, &err, school_team);
+               if (!parsed) {
                    complete = false;
-                   std::cerr << "No data received.\n";
+                   std::cerr << "Scoreboard unavailable for " << leagues[i] << ": "
+                             << (data.empty() ? "No data received" : err) << '\n';
+               }
+               if (parsed && !school_team.empty() && next_competitions->size() == previous_size) {
+                   try {
+                       auto id = school_team_ids.find(leagues[i]);
+                       if (id == school_team_ids.end())
+                           id = school_team_ids.emplace(leagues[i], findSchoolTeamId(league_url, school_team)).first;
+                       if (id->second.empty()) continue;
+                       FetchData schedule_fetcher(league_url + "/teams/" + id->second + "/schedule");
+                       std::vector<Competition> schedule;
+                       if (parser.parseESPNScoreboard(schedule_fetcher.fetch(), schedule, sports[i], leagues[i], {}, &err, school_team))
+                           appendSchoolScheduleGame(schedule, *next_competitions);
+                       else
+                           std::cerr << "Schedule unavailable for " << leagues[i] << ": " << err << '\n';
+                   } catch (const std::exception& error) {
+                       std::cerr << "Schedule lookup failed for " << leagues[i] << ": " << error.what() << '\n';
+                   }
                }
             }
             if (complete && !celebration_teams.empty()) {
@@ -290,7 +324,7 @@ void display_loop(std::atomic<bool>& running,
                   std::vector<Team>& rankings,
                   std::vector<std::string>& cities,
                   std::string active_display,
-                  double scroll_speed, int celebration_seconds, bool live_only) {
+                  double scroll_speed, int celebration_seconds, bool live_only, const std::string& school_team) {
     printf("Updating Display!\n");
 
 #ifdef MAC_STUB_MATRIX
@@ -395,6 +429,7 @@ void display_loop(std::atomic<bool>& running,
                     std::chrono::seconds(celebration_seconds)).count(), celebration_seconds * 1000LL);
             else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
             else if (live_only) display.drawMessage(scores ? "No live games" : "Fetching scores...");
+            else if (!school_team.empty()) display.drawMessage(scores ? "No games for " + school_team : "Fetching scores...");
         }
 
         // Rendering and VSync waiting count toward the 25 ms frame budget.
@@ -419,6 +454,7 @@ int main(int argc, char* argv[]) {
     };
     std::vector<std::string> cities;
     std::string default_city;
+    std::string school_team;
     std::vector<std::string> conferences;
 
     std::string active_display = "";
@@ -484,6 +520,16 @@ int main(int argc, char* argv[]) {
            default_city = argv[++i];
        } else if (arg == "--city") {
            cities.push_back(argv[++i]);
+       } else if (arg == "--school-team") {
+           if (i + 1 < argc) school_team = argv[++i];
+           if (school_team.empty() || school_team.size() > 12 ||
+               school_team.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") != std::string::npos) {
+               std::cerr << "--school-team requires a school abbreviation, such as NEB\n";
+               return 1;
+           }
+           for (char& ch : school_team)
+               if (ch >= 'a' && ch <= 'z') ch = ch - 'a' + 'A';
+           active_display = "sports";
        } else if (arg == "--conference") {
            conferences.push_back(argv[++i]);
        } else if (arg == "--college-football-rankings") {
@@ -519,6 +565,13 @@ int main(int argc, char* argv[]) {
        } else if (arg == "--scrolling") {
           scrolling = true;
        }
+    }
+
+    if (active_display == "sports" && !school_team.empty()) {
+        sports = {"football", "basketball", "baseball"};
+        leagues = {"college-football", "mens-college-basketball", "college-baseball"};
+    } else {
+        school_team.clear();
     }
 
     for (int i=0; i<int(cities.size()); i++) {
@@ -576,7 +629,7 @@ int main(int argc, char* argv[]) {
                               std::ref(rankings),
                               std::ref(cities),
                               active_display,
-                              scroll_speed, celebration_seconds, live_only);
+                              scroll_speed, celebration_seconds, live_only, std::cref(school_team));
 
     // Data Loop Thread
     std::thread fetchThread(fetch_loop,
@@ -589,7 +642,7 @@ int main(int argc, char* argv[]) {
                             std::ref(leagues),
                             std::ref(cities),
                             active_display,
-                            default_city, celebration_teams, celebration_preview, celebration_preview_kind);
+                            default_city, school_team, celebration_teams, celebration_preview, celebration_preview_kind);
 
 #ifdef MAC_STUB_MATRIX
     std::cout << "Close emulator window or press Esc to stop..." << std::endl;

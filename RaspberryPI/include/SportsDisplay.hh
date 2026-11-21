@@ -45,6 +45,8 @@ private:
     };
     std::map<int, Card> competition_cards;
     std::map<int, Card> ranking_cards;
+    std::map<std::string, bool> team_logo_overrides;
+    std::string teamLogoPath(const std::string& images_dir, const std::string& league, const Team& team);
     void drawCard(const Card& card, int x);
     const Card& competitionCard(std::vector<Competition>& competitions, int index, const std::string& images_dir);
     const Card& rankingCard(std::vector<Team>& rankings, int index, const std::string& images_dir);

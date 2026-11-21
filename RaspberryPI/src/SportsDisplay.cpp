@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include "../include/SportsDisplay.hh"
 #include "../include/FootballField.hh"
 #include <unistd.h>
@@ -9,6 +10,20 @@ using namespace rgb_matrix;
 using namespace Magick;
 
 auto last_index_update = std::chrono::steady_clock::now();
+
+std::string SportsDisplay::teamLogoPath(const std::string& images_dir, const std::string& league, const Team& team) {
+    const std::string base = images_dir + league + "/" + team.abbr;
+    if (!team.team_id.empty()) {
+        const std::string override_path = base + "-" + team.team_id + ".bmp";
+        auto [entry, inserted] = team_logo_overrides.try_emplace(override_path, false);
+        if (inserted) {
+            std::error_code error;
+            entry->second = std::filesystem::is_regular_file(override_path, error);
+        }
+        if (entry->second) return override_path;
+    }
+    return base + ".bmp";
+}
 
 SportsDisplay::SportsDisplay(int rows, int cols, int chain_length, const std::string& hardware_mapping, bool active, bool scrolling) : 
     Display(rows, cols, chain_length, hardware_mapping, active) {
@@ -147,9 +162,7 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
     max_display_x = -999;
 
     // Away Team Logo
-    std::ostringstream oss1("");
-    oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImage(oss1.str(), x_init);
+    drawImage(teamLogoPath(images_dir, competition.league, competition.AwayTeam), x_init);
 
     // Away Team Abbreviation
     int start_x = max_display_x;
@@ -217,9 +230,7 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
     if (competition.state != "pre") center_text(font, competition.HomeTeam.score, max_display_x-getTextWidth(font, competition.HomeTeam.abbr), max_display_x, 20, 255, 255, 0);
 
     // Home Team Logo
-    std::ostringstream oss2("");
-    oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
-    drawImage(oss2.str(), max_display_x);
+    drawImage(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x);
 
     // Calculate the Width of the Game Display
     competition.game_display_width = max_display_x - x_init;
@@ -239,9 +250,7 @@ void SportsDisplay::draw_basketball(Competition& competition, int x_init, const 
         draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss1("");
-    oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.AwayTeam), std::max(max_display_x, x_init), 0, 32);
     center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
 
     if (competition.HomeTeam.rank < 99) {
@@ -249,9 +258,7 @@ void SportsDisplay::draw_basketball(Competition& competition, int x_init, const 
         draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss2("");
-    oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
-    drawImageCentered(oss2.str(), max_display_x, 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x, 0, 32);
 
     // Team Abbreviations and Records
     x_offset = max_display_x + 8;
@@ -308,9 +315,7 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
         draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss1("");
-    oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.AwayTeam), std::max(max_display_x, x_init), 0, 32);
     center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
 
     if (competition.HomeTeam.rank < 99) {
@@ -318,9 +323,7 @@ void SportsDisplay::draw_football(Competition& competition, int x_init, const st
         draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss2("");
-    oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
-    drawImageCentered(oss2.str(), max_display_x, 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x, 0, 32);
 
     // Team Abbreviations and Records
     x_offset = max_display_x + 8;
@@ -406,9 +409,7 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
         draw_text(font, std::to_string(competition.AwayTeam.rank), x_init, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss1("");
-    oss1 << images_dir << competition.league << "/" << competition.AwayTeam.abbr << ".bmp";
-    drawImageCentered(oss1.str(), std::max(max_display_x, x_init), 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.AwayTeam), std::max(max_display_x, x_init), 0, 32);
     center_text_vertically(font, "vs", max_display_x, max_display_x+20, 0, 32, rgb_matrix::Color(255, 255, 255));
 
     if (competition.HomeTeam.rank < 99) {
@@ -416,9 +417,7 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
         draw_text(font, std::to_string(competition.HomeTeam.rank), x_offset, 8, rgb_matrix::Color(255, 255, 255));
     }
 
-    std::ostringstream oss2("");
-    oss2 << images_dir << competition.league << "/" << competition.HomeTeam.abbr << ".bmp";
-    drawImageCentered(oss2.str(), max_display_x, 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x, 0, 32);
 
     // Team Abbreviations and Records
     x_offset = max_display_x + 8;
@@ -569,7 +568,7 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
     const float glow = 0.6f + 0.4f * std::sin(tick / 600.0);
     DrawRectangleBorder(0, 0, display_width, 32, 1,
         rgb_matrix::Color(color.r * glow, color.g * glow, color.b * glow));
-    const std::string logo = images_dir + event.league + "/" + event.team.abbr + ".bmp";
+    const std::string logo = teamLogoPath(images_dir, event.league, event.team);
     const int logo_width = cachedImage(logo).width;
     const bool field_goal_good = event.label == "FIELD GOAL GOOD";
     const auto kick_duration = std::min(1500LL, duration_ms / 2);
@@ -738,9 +737,7 @@ void SportsDisplay::draw_ranking(Team& ranking, int x_init, const std::string& i
     draw_text(score_font, "#" + std::to_string(ranking.rank), x_init, 20, white);
 
     // Team Logos
-    std::ostringstream oss1("");
-    oss1 << images_dir << ranking.league << "/" << ranking.abbr << ".bmp";
-    drawImageCentered(oss1.str(), max_display_x+4, 0, 32);
+    drawImageCentered(teamLogoPath(images_dir, ranking.league, ranking), max_display_x+4, 0, 32);
 
     // Team Nick Name
     x_offset = max_display_x + 4;

@@ -25,6 +25,23 @@ In Sports mode, enable **Scroll scores** for scrolling instead of the static lay
 
 Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that interface. The default remains `0.0.0.0`, matching the original setup. Reserve the Pi's IP in your router for a stable bookmark.
 
+## Team logo updates
+
+From the repo root, generate team BMPs for NFL, college football, NBA, men's college basketball, MLB, and college baseball. The generator writes to `images/<league>/<ABBR>.bmp`. When multiple ESPN teams with artwork share an abbreviation, additional BMPs carry the ESPN team ID so the scoreboard can distinguish them.
+
+```bash
+.venv-controller/bin/python -m pip install Pillow
+.venv-controller/bin/python scripts/get_team_logos2.py --missing-only
+```
+
+Omit `--missing-only` to refresh existing logos. ESPN's dark-background artwork is preferred by default. To refresh one league or team, use `--league mens-college-basketball` or `--league mens-college-basketball --teams NEB,BTLR`. A refresh leaves files for teams outside its selection in place. The generated team folders are Git-ignored. Run the generator on the Pi or copy the generated league folders into the Pi checkout's `images/` directory. Reload the controller page and stop and start the display so it reloads the BMPs.
+
+## Follow a school
+
+In Sports mode, enter an ESPN team abbreviation such as `NEB` in **Follow a school across sports**. This uses the school's games from the college football, men's college basketball, and college baseball scoreboards. The school selection takes precedence over the league and conference checkboxes. Clear it to use those checkboxes again. Scroll scores and Only show live games also work with a school selected. Direct launches can use `./espn_jsonc --school-team NEB --scrolling`.
+
+When a league scoreboard has no game for the selected school, the display checks the school's schedule for a live game, its next matchup, or its latest result if no matchup is scheduled.
+
 ## Football scoring celebrations
 
 In Sports mode, enable **Scoring celebrations**, then use the NFL/College filter and abbreviation search to add teams. Selected teams appear as removable chips; up to 30 teams can be selected. Existing saved selections are preserved. Each scoring play takes over the full board for **30 seconds by default**; change the duration to any value from 1–300 seconds. The team logos, event, score, and pulsing team-color border appear before the normal display resumes. Celebrations show the event and score without a separate bottom score-change line. Combined touchdown/PAT updates show the six-point score first, followed by the conversion score. Touchdowns include referees raising their arms every four seconds and falling team-colored confetti around the steady text. Choices persist with your other settings. Stop and Start to apply changes.

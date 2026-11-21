@@ -23,7 +23,8 @@ public:
                              const std::string& sport,
                              const std::string& league,
                              const std::vector<std::string>& ext_conferences,
-                             std::string* error_path);
+                             std::string* error_path,
+                             const std::string& school_team = "");
     void parseESPNRankings(const std::string& jsonstr,
                            std::vector<Team>& teams,
                            std::string& sport,

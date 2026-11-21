@@ -118,11 +118,12 @@ ESPNParser::~ESPNParser() {
 
 std::string ESPNParser::getTeamRecord(const json& team_json) {
     try {
-        if (!team_json.contains("records")) return "";
-
-        for (const auto& record : team_json["records"]) {
+        const auto records = team_json.find(team_json.contains("records") ? "records" : "record");
+        if (records == team_json.end()) return "";
+        for (const auto& record : *records) {
             if (record.contains("type") && record["type"] == "total") {
-                return record.value("summary", "");
+                const auto summary = optionalText(record, "summary");
+                return summary.empty() ? optionalText(record, "displayValue") : summary;
             }
         }
     } catch (...) {
@@ -200,7 +201,8 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                                      const std::string& sport,
                                      const std::string& league,
                                      const std::vector<std::string>& ext_conferences,
-                                     std::string* error_path) {
+                                     std::string* error_path,
+                                     const std::string& school_team) {
     auto fail = [&](const std::string& where, const std::string& what) {
         if (error_path) *error_path = where + " — " + what;
         return false;
@@ -218,6 +220,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             return fail(ctx, "missing 'events' array");
         }
 
+        const auto logo_index = competitions.size();
         // Add competitions entry for Sport Logo
         {
             Competition game;
@@ -286,7 +289,9 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 std::tie(game.day, game.date, game.time) = convertToLocalTime(iso);
                 std::tm start = {};
                 std::istringstream timestamp(iso);
-                timestamp >> std::get_time(&start, "%Y-%m-%dT%H:%M:%S");
+                timestamp >> std::get_time(&start, "%Y-%m-%dT%H:%M");
+                if (!timestamp.fail() && timestamp.peek() == ':')
+                    timestamp >> std::get_time(&start, ":%S");
                 if (!timestamp.fail()) game.start_time = timegm(&start);
             }
 
@@ -317,10 +322,19 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     }
                 }
 
+                std::string score = "0";
+                const auto score_value = team.find("score");
+                if (score_value != team.end()) {
+                    if (score_value->is_string()) score = score_value->get<std::string>();
+                    else if (score_value->is_object()) {
+                        const auto display_value = optionalText(*score_value, "displayValue");
+                        if (!display_value.empty()) score = display_value;
+                    }
+                }
                 if (is_home) {
                     game.HomeTeam.team_id = teamObj.at("id").get<std::string>();
                     game.HomeTeam.abbr = teamObj.at("abbreviation").get<std::string>();
-                    game.HomeTeam.score = team.value("score", "0"); // score can be missing pregame
+                    game.HomeTeam.score = score;
                     game.HomeTeam.record = getTeamRecord(team);
                     game.HomeTeam.rank = getTeamRank(team);
                     game.HomeTeam.color = get_color("color", "FFFFFF");
@@ -329,7 +343,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 } else {
                     game.AwayTeam.team_id = teamObj.at("id").get<std::string>();
                     game.AwayTeam.abbr = teamObj.at("abbreviation").get<std::string>();
-                    game.AwayTeam.score = team.value("score", "0");
+                    game.AwayTeam.score = score;
                     game.AwayTeam.record = getTeamRecord(team);
                     game.AwayTeam.rank = getTeamRank(team);
                     game.AwayTeam.color = get_color("color", "FFFFFF");
@@ -367,7 +381,10 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
             }
 
             // External conference filtering (college football)
-            if (!ext_conferences.empty() && league == "college-football") {
+            if (!school_team.empty()) {
+                if (game.HomeTeam.abbr == school_team || game.AwayTeam.abbr == school_team)
+                    competitions.push_back(game);
+            } else if (!ext_conferences.empty() && league == "college-football") {
                 // Note: guard lookups into `conferences` map if needed in your codebase
                 for (size_t k = 0; k < ext_conferences.size(); ++k) {
                     bool match =
@@ -382,6 +399,8 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 competitions.push_back(game);
             }
         }
+        if (!school_team.empty() && competitions.size() == logo_index + 1)
+            competitions.pop_back();
 
     } catch (const nlohmann::json::exception& e) {
         std::cout << ctx << "\n";
@@ -419,6 +438,7 @@ void ESPNParser::parseESPNRankings(const std::string& jsonstr,
             t.sports_logo_rank = false;
             t.rank = rank["current"].get<int>();
             t.abbr = rank["team"]["abbreviation"];
+            t.team_id = optionalText(rank["team"], "id");
             t.color = rank["team"].contains("color") ? rank["team"]["color"] : "FFFFFF";
             t.alt_color = rank["team"].contains("alternateColor") ? rank["team"]["alternateColor"] : "000000";
             t.nick_name = rank["team"]["nickname"];

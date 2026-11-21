@@ -4,6 +4,7 @@ import atexit
 import hmac
 import json
 import os
+import re
 import sys
 from pathlib import Path
 import secrets
@@ -112,6 +113,16 @@ HTML = """
   <div id="sports-wrapper">
     <label><input type="checkbox" id="scrolling"> Scroll scores</label>
     <label><input type="checkbox" id="live-only"> Only show live games</label>
+    <label for="school-team">Follow a school across sports</label>
+    <input type="text" id="school-team" list="school-teams" maxlength="12"
+           autocapitalize="characters" placeholder="Team abbreviation, e.g. NEB">
+    <datalist id="school-teams">
+      <option value="NEB">Nebraska Cornhuskers</option>
+      {% for team in celebration_catalog["college-football"] if team != "NEB" %}
+      <option value="{{ team }}"></option>
+      {% endfor %}
+    </datalist>
+    <p>Follow this school's football, men's basketball, and baseball games. Between games, see the next matchup or latest result. Clear the field to use the league and conference selections.</p>
     <div class="section-label">Sports</div>
     <div class="checkbox-group">
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
@@ -471,6 +482,8 @@ HTML = """
           });
         }
         const params = new URLSearchParams(mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs + celebrationArgs);
+        const school = document.getElementById("school-team").value.trim().toUpperCase();
+        if (mode === "sports" && school) params.set("school_team", school);
         showStatus(await api("/start", {method: "POST", body: JSON.stringify(Object.fromEntries(
           Array.from(new Set(params.keys()), key => [key, ["city", "conf", "celebration_team"].includes(key) ? params.getAll(key) : params.get(key)])
         ))}));
@@ -740,7 +753,10 @@ def validate_start(args):
                 raise ValueError(f"Invalid {key} selection.")
         elif not isinstance(value, str) or len(value) > 200 or value.strip().startswith("-"):
             raise ValueError(f"Invalid {key} value.")
-    if mode == "sports" and not any(key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL")):
+    school = args.get("school_team", "").strip().upper()
+    if school and not re.fullmatch(r"[A-Z0-9]{1,12}", school):
+        raise ValueError("Enter a school abbreviation such as NEB.")
+    if mode == "sports" and not school and not any(key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL")):
         raise ValueError("Select at least one sport.")
     if mode == "rankings" and not any(key in args for key in ("NCAAFRankings", "NCAABRankings")):
         raise ValueError("Select at least one rankings sport.")
@@ -837,22 +853,19 @@ def start_app():
         cmd = ([] if sys.platform == "darwin" or os.geteuid() == 0 else ["sudo", "-n"]) + [str(ROOT / "RaspberryPI" / "espn_jsonc")]
 
         if mode == "sports":
+            school = args.get("school_team", "").strip().upper()
             if args.get("scrolling") == "1":
                 cmd.append("--scrolling")
             if args.get("live_only") == "1":
                 cmd.append("--live-only")
-            if mlb:
-                cmd.append("--mlb")
-            if nba:
-                cmd.append("--nba")
-            if ncaaf:
-                cmd.append("--ncaaf")
-            if ncaab:
-                cmd.append("--ncaab")
-            if ncaabs:
-                cmd.append("--ncaabs")
-            if nfl:
-                cmd.append("--nfl")
+            if school:
+                cmd += ["--school-team", school]
+                conferences = []
+            else:
+                cmd.extend(flag for enabled, flag in (
+                    (mlb, "--mlb"), (nba, "--nba"), (ncaaf, "--ncaaf"),
+                    (ncaab, "--ncaab"), (ncaabs, "--ncaabs"), (nfl, "--nfl"),
+                ) if enabled)
             if args.get("celebration_preview"):
                 cmd += ["--celebration-preview", args["celebration_preview"],
                         "--celebration-preview-kind", args.get("celebration_preview_kind", "touchdown")]

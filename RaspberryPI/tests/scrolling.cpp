@@ -63,6 +63,22 @@ int main() {
         game.state = "post";
         assert(sportsPollSeconds({game}, 1000) == 900);
         assert(sportsPollSeconds({}, 1000) == 900);
+        active.start_time = 4000;
+        game.state = "pre";
+        game.start_time = 2000;
+        auto later = game;
+        later.start_time = 3000;
+        final_game.start_time = 1000;
+        auto older = final_game;
+        older.start_time = 500;
+        std::vector<Competition> school_games;
+        appendSchoolScheduleGame({logo, later, final_game, game}, school_games);
+        appendSchoolScheduleGame({logo, final_game, older}, school_games);
+        appendSchoolScheduleGame({logo, game, active}, school_games);
+        assert(school_games.size() == 6);
+        assert(school_games[1].start_time == 2000);
+        assert(school_games[3].start_time == 1000);
+        assert(school_games[5].state == "in");
     }
 
     {
@@ -147,6 +163,33 @@ int main() {
         assert(tracker.pending.size() == 2);
     }
     ESPNParser parser;
+    {
+        auto team = [](const char* side, const char* abbr, const char* id) {
+            return json{{"homeAway", side}, {"team", {{"abbreviation", abbr}, {"id", id}}},
+                        {"score", {{"displayValue", "17"}}},
+                        {"record", json::array({{{"type", "total"}, {"displayValue", "5-2"}}})}};
+        };
+        auto event = [](const char* id, const json& home, const json& away) {
+            const json game = {{"status", {{"period", 0}, {"type", {{"state", "pre"}, {"shortDetail", "7:00 PM"}}}}},
+                               {"date", "2026-11-07T20:00Z"},
+                               {"competitors", json::array({home, away})}};
+            return json{{"id", id}, {"competitions", json::array({game})}};
+        };
+        const auto unrelated = event("skip", team("home", "IOWA", "2294"), team("away", "WIS", "275"));
+        const auto home = event("home", team("home", "NEB", "158"), team("away", "IOWA", "2294"));
+        const auto away = event("away", team("home", "IOWA", "2294"), team("away", "NEB", "158"));
+        std::vector<Competition> parsed;
+        std::string error;
+        const json scores = {{"events", json::array({unrelated, home, away})}};
+        assert(parser.parseESPNScoreboard(scores.dump(), parsed, "football", "college-football", {"ACC"}, &error, "NEB"));
+        assert(parsed.size() == 3 && parsed[0].sports_logo_comp);
+        assert(parsed[1].event_id == "home" && parsed[2].event_id == "away");
+        assert(parsed[1].start_time > 0);
+        assert(parsed[1].HomeTeam.score == "17" && parsed[1].HomeTeam.record == "5-2");
+        const json no_match = {{"events", json::array({unrelated})}};
+        assert(parser.parseESPNScoreboard(no_match.dump(), parsed, "baseball", "college-baseball", {}, &error, "NEB"));
+        assert(parsed.size() == 3); // No separator for a league without a matching game.
+    }
     auto parse_clock = [&](const json& competition_status, const json& event_status) {
         const json competition = {{"status", competition_status}, {"date", "2026-11-07T20:00:00Z"},
                                   {"competitors", json::array()}};
@@ -348,7 +391,14 @@ int main() {
         const auto& frame = rgb_matrix::g_emulator_pixels;
         return frame[pixel] == r && frame[pixel + 1] == g && frame[pixel + 2] == b;
     };
+    Magick::Image alternate_logo(Magick::Geometry(12, 16), Magick::Color("cyan"));
+    alternate_logo.write(assets + "test/HOM-42.bmp");
+    auto shared_abbreviation = field_goal;
+    shared_abbreviation.team.team_id = "42";
+    display.drawCelebration(shared_abbreviation, assets, 0);
+    assert(pixel_is(7, 12, 0, 255, 255));
     display.drawCelebration(field_goal, assets, 0);
+    assert(pixel_is(7, 12, 255, 0, 0)); // The existing abbreviation filename is the fallback.
     assert(pixel_is(76, 26, 235, 115, 45));
     assert(pixel_is(128, 22, 255, 210, 35));
     assert(pixel_is(128, 5, 0, 0, 0));
