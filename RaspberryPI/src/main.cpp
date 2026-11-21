@@ -392,7 +392,7 @@ void display_loop(std::atomic<bool>& running,
             }
             if (!celebrations.empty()) display.drawCelebration(celebrations.front(), "../images/",
                 std::chrono::duration_cast<std::chrono::milliseconds>(now - celebration_end +
-                    std::chrono::seconds(celebration_seconds)).count());
+                    std::chrono::seconds(celebration_seconds)).count(), celebration_seconds * 1000LL);
             else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
             else if (live_only) display.drawMessage(scores ? "No live games" : "Fetching scores...");
         }

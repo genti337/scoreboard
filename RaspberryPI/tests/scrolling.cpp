@@ -341,6 +341,30 @@ int main() {
     celebration_image.read(256, 32, "RGB", Magick::CharPixel, rgb_matrix::g_emulator_pixels.data());
     celebration_image.resize(Magick::Geometry(1024, 128));
     celebration_image.write("/tmp/scoreboard-celebration.png");
+    const ScoringCelebration field_goal{celebration_game.HomeTeam, "test", "FIELD GOAL GOOD",
+                                        "AWY 24 - HOM 23", "HOM +3"};
+    auto pixel_is = [](int x, int y, int r, int g, int b) {
+        const int pixel = (y * 256 + x) * 3;
+        const auto& frame = rgb_matrix::g_emulator_pixels;
+        return frame[pixel] == r && frame[pixel + 1] == g && frame[pixel + 2] == b;
+    };
+    display.drawCelebration(field_goal, assets, 0);
+    assert(pixel_is(76, 26, 235, 115, 45));
+    assert(pixel_is(128, 22, 255, 210, 35));
+    assert(pixel_is(128, 5, 0, 0, 0));
+    assert(pixel_is(50, 27, 0, 0, 0));
+    assert(pixel_is(76, 28, 0, 0, 0));
+    assert(pixel_is(140, 27, 0, 0, 0));
+    display.drawCelebration(field_goal, assets, 900);
+    assert(pixel_is(76, 26, 0, 0, 0));
+    assert(pixel_is(122, 12, 235, 115, 45)); // Ball is between the uprights.
+    display.drawCelebration(field_goal, assets, 1200);
+    assert(pixel_is(122, 12, 0, 0, 0));
+    assert(pixel_is(128, 22, 255, 210, 35));
+    display.drawCelebration(field_goal, assets, 1500);
+    assert(!pixel_is(128, 22, 255, 210, 35)); // Return to the existing celebration.
+    display.drawCelebration(field_goal, assets, 500, 1000);
+    assert(!pixel_is(128, 22, 255, 210, 35)); // A one-second celebration still shows its result.
     display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23", "NO CHANGE"}, assets, 0);
     const auto no_good_out = rgb_matrix::g_emulator_pixels;
     display.drawCelebration({celebration_game.HomeTeam, "test", "FIELD GOAL MISSED", "AWY 24 - HOM 23", "NO CHANGE"}, assets, 350);

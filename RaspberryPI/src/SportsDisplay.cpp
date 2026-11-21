@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include "../include/SportsDisplay.hh"
 #include "../include/FootballField.hh"
@@ -559,7 +560,8 @@ void SportsDisplay::draw_football2(Competition& competition, int x_init, const s
 }
 
 
-void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::string& images_dir, long long elapsed_ms) {
+void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::string& images_dir,
+                                    long long elapsed_ms, long long duration_ms) {
     canvas->Clear();
     const auto color = brighterHex(event.team.color, event.team.alt_color);
     const auto tick = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -569,8 +571,11 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
         rgb_matrix::Color(color.r * glow, color.g * glow, color.b * glow));
     const std::string logo = images_dir + event.league + "/" + event.team.abbr + ".bmp";
     const int logo_width = cachedImage(logo).width;
-    if (event.label == "TOUCHDOWN!" || event.label == "FIELD GOAL GOOD" ||
-        event.label == "EXTRA POINT GOOD") {
+    const bool field_goal_good = event.label == "FIELD GOAL GOOD";
+    const auto kick_duration = std::min(1500LL, duration_ms / 2);
+    const bool show_kick = field_goal_good && elapsed_ms < kick_duration;
+    if (!show_kick && (event.label == "TOUCHDOWN!" || field_goal_good ||
+        event.label == "EXTRA POINT GOOD")) {
         // Deterministic particles move with elapsed time, independent of frame rate.
         const auto alternate = colorFromHex(event.team.alt_color);
         const int text_left = logo_width + 28;
@@ -591,10 +596,49 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
     drawImageCentered(logo, display_width - logo_width - 4, 1, 31);
     int left = logo_width + 10;
     int right = display_width - logo_width - 10;
+    const auto heading = event.team.abbr + "  " + event.label;
+    if (show_kick) {
+        const int goal_x = display_width / 2;
+        const int launch_x = std::max(left + 4, goal_x - 52);
+        const auto gold = rgb_matrix::Color(255, 210, 35);
+        // The uprights and crossbar frame the opening above the support.
+        for (int y = 3; y <= 23; ++y) {
+            canvas->SetPixel(goal_x - 15, y, gold.r, gold.g, gold.b);
+            canvas->SetPixel(goal_x - 14, y, gold.r, gold.g, gold.b);
+            canvas->SetPixel(goal_x + 14, y, gold.r, gold.g, gold.b);
+            canvas->SetPixel(goal_x + 15, y, gold.r, gold.g, gold.b);
+        }
+        for (int x = goal_x - 15; x <= goal_x + 15; ++x) {
+            canvas->SetPixel(x, 22, gold.r, gold.g, gold.b);
+            canvas->SetPixel(x, 23, gold.r, gold.g, gold.b);
+        }
+        for (int y = 24; y <= 30; ++y) {
+            canvas->SetPixel(goal_x, y, gold.r, gold.g, gold.b);
+            canvas->SetPixel(goal_x + 1, y, gold.r, gold.g, gold.b);
+        }
+
+        // Arc into the opening, then shrink as the ball travels beyond the posts.
+        const double kick_elapsed = elapsed_ms * 1500.0 / kick_duration;
+        if (kick_elapsed < 1100) {
+            const double flight = std::clamp((kick_elapsed - 100) / 1000.0, 0.0, 1.0);
+            const int ball_x = std::lround(launch_x + (goal_x + 6 - launch_x) * flight);
+            const int ball_y = std::lround(26 - 14 * flight - 18 * flight * (1 - flight));
+            const int half_width = flight < 0.8 ? 4 : 2;
+            for (int dx = -half_width; dx <= half_width; ++dx)
+                canvas->SetPixel(ball_x + dx, ball_y, 235, 115, 45);
+            for (int dx = 1 - half_width; dx < half_width; ++dx) {
+                canvas->SetPixel(ball_x + dx, ball_y - 1, 235, 115, 45);
+                canvas->SetPixel(ball_x + dx, ball_y + 1, 170, 70, 25);
+            }
+            canvas->SetPixel(ball_x, ball_y - 1, 255, 255, 255);
+        }
+        canvas = matrix->SwapOnVSync(canvas);
+        return;
+    }
     const bool no_good = event.label.find("MISSED") != std::string::npos ||
                          event.label.find("BLOCKED") != std::string::npos ||
                          event.label.find("NO GOOD") != std::string::npos;
-    if (event.label == "TOUCHDOWN!" || event.label == "FIELD GOAL GOOD" ||
+    if (event.label == "TOUCHDOWN!" || field_goal_good ||
         event.label == "EXTRA POINT GOOD" || no_good) {
         // 13 x 25 pixel official: raised arms, white cap, striped shirt,
         // dark trousers. Draw directly so no extra bitmap assets are needed.
@@ -672,7 +716,6 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
         left += 18;
         right -= 18;
     }
-    const auto heading = event.team.abbr + "  " + event.label;
     const auto& heading_font = getTextWidth(abbr_font, heading) <= right - left ? abbr_font : game_font;
     center_text(heading_font, heading, left, right, 14, color);
     center_text(game_font, event.score, left, right, 27, rgb_matrix::Color(255,255,255));
