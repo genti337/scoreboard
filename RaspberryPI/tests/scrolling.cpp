@@ -31,12 +31,19 @@ Competition fixture(const std::string& sport, const std::string& state) {
     c.shortDetail = state == "post" ? "Final" : "3rd Quarter - 5:34";
     c.on_first = true; c.on_second = false; c.on_third = true; c.outs = "1";
     c.yard_line = 35;
+    if (sport == "volleyball") {
+        c.HomeTeam.score = "2"; c.AwayTeam.score = "1";
+        c.home_set_points = {"25", "22", "25"};
+        c.away_set_points = {"22", "25", "20"};
+        c.shortDetail = state == "post" ? "Final" : "3rd Set";
+    }
     return c;
 }
 
 void drawDirect(SportsDisplay& d, Competition& c, int x) {
     if (c.sport == "football") d.draw_football(c, x, assets);
     else if (c.sport == "basketball") d.draw_basketball(c, x, assets);
+    else if (c.sport == "volleyball") d.draw_volleyball(c, x, assets);
     else d.draw_baseball(c, x, assets);
 }
 
@@ -163,6 +170,49 @@ int main() {
         assert(tracker.pending.size() == 2);
     }
     ESPNParser parser;
+    {
+        const auto standings = json::parse(R"({"children":[{"standings":{"entries":[
+            {"team":{"id":"158"},"stats":[{"name":"vsconf","summary":"0-0"},{"name":"overall","summary":"5-0"}]},
+            {"team":{"id":"2086"},"stats":[{"name":"overall","displayValue":"4-2"}]},
+            {"team":{"id":"3"},"stats":[{"name":"home","summary":"3-0"}]}
+        ]}}]})");
+        const auto records = ESPNParser::parseOverallStandings(standings);
+        assert(records.size() == 2 && records.at("158") == "5-0" && records.at("2086") == "4-2");
+    }
+    {
+        Team team;
+        ESPNParser::fillTeamColors(team, {{"color", nullptr}, {"alternateColor", "not-hex"}});
+        assert(team.color.empty() && team.alt_color.empty());
+        ESPNParser::fillTeamColors(team, {{"color", "#e31937"}, {"alternateColor", nullptr}});
+        assert(team.color == "e31937" && team.alt_color.empty());
+        ESPNParser::fillTeamColors(team, {{"color", "ffffff"}, {"alternateColor", "ffffff"}});
+        assert(team.color == "e31937" && team.alt_color == "ffffff");
+    }
+    {
+        const json home = {{"homeAway", "home"}, {"team", {{"id", "158"}, {"abbreviation", "NEB"}}},
+                           {"curatedRank", {{"current", 2}}},
+                           {"score", "2"}, {"linescores", json::array({
+                               {{"period", 3}, {"displayValue", "25"}},
+                               {{"period", 1}, {"value", 25}},
+                               {{"period", 6}, {"displayValue", "99"}}
+                           })}};
+        const json away = {{"homeAway", "away"}, {"team", {{"id", "95"}, {"abbreviation", "KU"}}},
+                           {"winner", true},
+                           {"score", 1}, {"linescores", json::array({{{"period", 2}, {"displayValue", "25"}}})}};
+        const json match = {{"status", {{"period", 3}, {"type", {{"state", "in"}, {"shortDetail", "3rd Set"}}}}},
+                            {"date", "2026-11-21T20:00Z"}, {"competitors", json::array({home, away})}};
+        const json payload = {{"events", json::array({{{"competitions", json::array({match})}}})}};
+        std::vector<Competition> games;
+        std::string error;
+        assert(parser.parseESPNScoreboard(payload.dump(), games, "volleyball", "womens-college-volleyball", {}, &error));
+        assert(games.size() == 2 && games[0].sports_logo_comp);
+        const auto& game = games.back();
+        assert(game.HomeTeam.rank == 2 && game.AwayTeam.rank == 99);
+        assert(game.winner_team_id == "95");
+        assert(game.HomeTeam.score == "2" && game.AwayTeam.score == "1");
+        assert(game.home_set_points[0] == "25" && game.home_set_points[1].empty() && game.home_set_points[2] == "25");
+        assert(game.away_set_points[1] == "25" && game.shortDetail == "3rd Set");
+    }
     {
         auto team = [](const char* side, const char* abbr, const char* id) {
             return json{{"homeAway", side}, {"team", {{"abbreviation", abbr}, {"id", id}}},
@@ -320,7 +370,7 @@ int main() {
     Magick::Image arrow_image(Magick::Geometry(2, 2), Magick::Color("green"));
     arrow_image.write(assets + "arrow_right.bmp");
     arrow_image.write(assets + "arrow_left.bmp");
-    for (const std::string sport : {"football", "basketball", "baseball"}) {
+    for (const std::string sport : {"football", "basketball", "baseball", "volleyball"}) {
         for (const std::string state : {"pre", "in", "post"}) {
             SportsDisplay cached(32, 64, 4, "regular", true, true);
             SportsDisplay direct(32, 64, 4, "regular", true, true);
@@ -364,6 +414,94 @@ int main() {
         }
     }
     SportsDisplay display(32, 64, 4, "regular", true, true);
+    {
+        SportsDisplay ticker(32, 64, 4, "regular", true, true);
+        auto divider = fixture("volleyball", "pre");
+        divider.sports_logo_comp = true;
+        std::vector<Competition> dividers{divider};
+        for (const auto& [league, width] : {
+                 std::pair{"nfl", 32}, std::pair{"nba", 16}, std::pair{"mlb", 32},
+                 std::pair{"college-football", 28}, std::pair{"mens-college-basketball", 28},
+                 std::pair{"college-baseball", 28}, std::pair{"womens-college-volleyball", 28},
+                 std::pair{"mens-college-volleyball", 28}}) {
+            dividers[0].league = league;
+            ticker.invalidateCards(true);
+            ticker.draw(dividers, "../images/");
+            assert(dividers[0].game_display_width == width);
+        }
+    }
+    for (const std::string sport : {"basketball", "baseball", "volleyball"}) {
+        auto game = fixture(sport, "in");
+        game.AwayTeam.color.clear();
+        game.AwayTeam.alt_color.clear();
+        ESPNParser::fillTeamColors(game.AwayTeam, {{"color", "e31937"}});
+        display.canvas->Clear();
+        drawDirect(display, game, 0);
+        const auto& pixels = display.canvas->pixels();
+        bool has_team_color = false;
+        for (size_t i = 0; i + 2 < pixels.size(); i += 3)
+            if (pixels[i] == 227 && pixels[i + 1] == 25 && pixels[i + 2] == 55) has_team_color = true;
+        assert(has_team_color);
+    }
+    display.canvas->Clear();
+    auto baseball = fixture("baseball", "post");
+    baseball.AwayTeam.score = baseball.HomeTeam.score = "123";
+    display.draw_baseball(baseball, 0, assets);
+    const auto& baseball_pixels = display.canvas->pixels();
+    for (int gap_x : {12, baseball.game_display_width - 12 - 4})
+        for (int y = 0; y < 32; ++y)
+            for (int x = gap_x; x < gap_x + 4; ++x)
+                for (int channel = 0; channel < 3; ++channel)
+                    assert(baseball_pixels[(y * 256 + x) * 3 + channel] == 0);
+    display.canvas->Clear();
+    auto volleyball = fixture("volleyball", "in");
+    display.draw_volleyball(volleyball, 0, assets);
+    const auto& volleyball_pixels = display.canvas->pixels();
+    // Both 12-pixel logos precede the match details, with a 20-pixel "vs" gap.
+    assert(volleyball_pixels[(12 * 256 + 3) * 3] == 255);
+    assert(volleyball_pixels[(12 * 256 + 35) * 3] == 255);
+    const auto with_records = volleyball_pixels;
+    auto without_records = volleyball;
+    without_records.AwayTeam.record.clear();
+    without_records.HomeTeam.record.clear();
+    display.canvas->Clear();
+    display.draw_volleyball(without_records, 0, assets);
+    for (int row : {11, 27}) {
+        bool has_record = false;
+        for (int y = row; y < row + 5; ++y)
+            for (int x = 53; x < 67; ++x) {
+                const int index = (y * 256 + x) * 3;
+                if (with_records[index] == 255 && volleyball_pixels[index] == 0) has_record = true;
+            }
+        assert(has_record);
+    }
+    volleyball.HomeTeam.rank = 2;
+    display.canvas->Clear();
+    display.draw_volleyball(volleyball, 0, assets);
+    auto top_row_has_rank = [&](int x) {
+        for (int y = 0; y < 8; ++y)
+            for (int dx = 0; dx < 12; ++dx)
+                if (volleyball_pixels[(y * 256 + x + dx) * 3] == 255) return true;
+        return false;
+    };
+    assert(top_row_has_rank(20));
+    volleyball.state = "post";
+    volleyball.AwayTeam.score = volleyball.HomeTeam.score = "-";
+    auto winner_arrow_y = [&](const std::string& winner_id, int y) {
+        volleyball.winner_team_id = winner_id;
+        display.canvas->Clear();
+        display.draw_volleyball(volleyball, 0, assets);
+        // The arrow fixture's red pixel is four rows below its top edge.
+        for (int x = 67; x < 105; ++x) {
+            const int index = (y * 256 + x) * 3;
+            if (volleyball_pixels[index] == 255 && volleyball_pixels[index + 1] == 0 &&
+                volleyball_pixels[index + 2] == 0) return true;
+        }
+        return false;
+    };
+    assert(winner_arrow_y(volleyball.AwayTeam.team_id, 11));
+    assert(winner_arrow_y(volleyball.HomeTeam.team_id, 27));
+    assert(!winner_arrow_y("", 11) && !winner_arrow_y("", 27));
     auto celebration_game = fixture("football", "in");
     display.drawCelebration({celebration_game.HomeTeam, "test", "TOUCHDOWN!", "AWY 24 - HOM 23", "HOM +6"}, assets);
     assert(std::any_of(rgb_matrix::g_emulator_pixels.begin(), rgb_matrix::g_emulator_pixels.end(),

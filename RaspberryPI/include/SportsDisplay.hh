@@ -27,6 +27,7 @@ public:
                                       const std::string& possessionTeamAbbrev);
     void draw_baseball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_basketball(Competition& competition, int x_init, const std::string& images_dir);
+    void draw_volleyball(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football(Competition& competition, int x_init, const std::string& images_dir);
     void draw_football2(Competition& competition, int x_init, const std::string& images_dir);
     void drawCelebration(const ScoringCelebration& event, const std::string& images_dir,

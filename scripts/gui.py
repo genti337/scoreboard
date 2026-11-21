@@ -122,7 +122,7 @@ HTML = """
       <option value="{{ team }}"></option>
       {% endfor %}
     </datalist>
-    <p>Follow this school's football, men's basketball, and baseball games. Between games, see the next matchup or latest result. Clear the field to use the league and conference selections.</p>
+    <p>Follow this school's football, men's basketball, baseball, and volleyball. Between games, see the next matchup or latest result. Clear the field to use the league and conference selections.</p>
     <div class="section-label">Sports</div>
     <div class="checkbox-group">
       <label><input type="checkbox" id="mlb" onchange="updateConferenceSection()"> MLB</label>
@@ -131,6 +131,8 @@ HTML = """
       <label><input type="checkbox" id="ncaab" onchange="updateConferenceSection()"> NCAAB</label>
       <label><input type="checkbox" id="ncaabs" onchange="updateConferenceSection()"> NCAABS</label>
       <label><input type="checkbox" id="nfl" onchange="updateConferenceSection()"> NFL</label>
+      <label><input type="checkbox" id="ncaavb"> Women's college volleyball</label>
+      <label><input type="checkbox" id="ncaamvb"> Men's college volleyball</label>
     </div>
   </div>
 
@@ -484,6 +486,8 @@ HTML = """
         const params = new URLSearchParams(mlb + nba + ncaaf + ncaab + ncaabs + nfl + ncaafRankings + ncaabRankings + modeArg + cityArgs + confArgs + countdownArgs + celebrationArgs);
         const school = document.getElementById("school-team").value.trim().toUpperCase();
         if (mode === "sports" && school) params.set("school_team", school);
+        if (mode === "sports" && document.getElementById("ncaavb").checked) params.set("NCAAVB", "1");
+        if (mode === "sports" && document.getElementById("ncaamvb").checked) params.set("NCAAMVB", "1");
         showStatus(await api("/start", {method: "POST", body: JSON.stringify(Object.fromEntries(
           Array.from(new Set(params.keys()), key => [key, ["city", "conf", "celebration_team"].includes(key) ? params.getAll(key) : params.get(key)])
         ))}));
@@ -756,7 +760,9 @@ def validate_start(args):
     school = args.get("school_team", "").strip().upper()
     if school and not re.fullmatch(r"[A-Z0-9]{1,12}", school):
         raise ValueError("Enter a school abbreviation such as NEB.")
-    if mode == "sports" and not school and not any(key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL")):
+    if mode == "sports" and not school and not any(
+        key in args for key in ("MLB", "NBA", "NCAAF", "NCAAB", "NCAABS", "NFL", "NCAAVB", "NCAAMVB")
+    ):
         raise ValueError("Select at least one sport.")
     if mode == "rankings" and not any(key in args for key in ("NCAAFRankings", "NCAABRankings")):
         raise ValueError("Select at least one rankings sport.")
@@ -865,6 +871,7 @@ def start_app():
                 cmd.extend(flag for enabled, flag in (
                     (mlb, "--mlb"), (nba, "--nba"), (ncaaf, "--ncaaf"),
                     (ncaab, "--ncaab"), (ncaabs, "--ncaabs"), (nfl, "--nfl"),
+                    ("NCAAVB" in args, "--ncaavb"), ("NCAAMVB" in args, "--ncaamvb"),
                 ) if enabled)
             if args.get("celebration_preview"):
                 cmd += ["--celebration-preview", args["celebration_preview"],

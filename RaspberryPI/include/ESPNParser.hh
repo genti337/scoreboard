@@ -2,6 +2,7 @@
 #define ESPNPARSER_HH
 
 #include <string>
+#include <map>
 #include <vector>
 #include <ctime>
 #include <curl/curl.h>
@@ -17,6 +18,8 @@ public:
 
     std::string getTeamRecord(const json& team_json);
     int getTeamRank(const json& team_json);
+    static void fillTeamColors(Team& team, const json& metadata);
+    static std::map<std::string, std::string> parseOverallStandings(const json& standings);
     std::tuple<std::string, std::string, std::string> convertToLocalTime(const std::string& utc_time_str);
     bool parseESPNScoreboard(const std::string& jsonStr,
                              std::vector<Competition>& competitions,

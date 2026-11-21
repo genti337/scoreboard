@@ -1,6 +1,7 @@
 #ifndef COMPETITION_HH
 #define COMPETITION_HH
 
+#include <array>
 #include <string>
 #include <ctime>
 #include <vector>
@@ -43,6 +44,10 @@ public:
     bool on_first;		//
     bool on_second;		//
     bool on_third;		//
+
+    std::array<std::string, 5> home_set_points;
+    std::array<std::string, 5> away_set_points;
+    std::string winner_team_id;
 
 private:
 

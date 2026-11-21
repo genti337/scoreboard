@@ -1,6 +1,9 @@
 .DS*
 .*swp
 images
+!/images/
+/images/*
+!/images/sport-dividers/
 .vscode
 .controller/
 __pycache__/

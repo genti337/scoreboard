@@ -228,8 +228,8 @@ float Display::getBrightness(const rgb_matrix::Color& color) {
 
 // Compare two hex colors and return which one is brighter
 rgb_matrix::Color Display::brighterHex(const std::string& hex1, const std::string& hex2) {
-    auto color1 = colorFromHex(hex1);
-    auto color2 = colorFromHex(hex2);
+    auto color1 = hex1.empty() ? rgb_matrix::Color(0, 0, 0) : colorFromHex(hex1);
+    auto color2 = hex2.empty() ? rgb_matrix::Color(0, 0, 0) : colorFromHex(hex2);
     auto white = rgb_matrix::Color(255,255,255);
     float b1 = getBrightness(color1);
     float b2 = getBrightness(color2);

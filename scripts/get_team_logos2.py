@@ -29,6 +29,8 @@ LEAGUE_SPORTS = {
     "mens-college-basketball": "basketball",
     "mlb": "baseball",
     "college-baseball": "baseball",
+    "womens-college-volleyball": "volleyball",
+    "mens-college-volleyball": "volleyball",
 }
 
 def fetch_teams_index(sport: str, league: str):

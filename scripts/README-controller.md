@@ -25,9 +25,11 @@ In Sports mode, enable **Scroll scores** for scrolling instead of the static lay
 
 Optionally set `SCOREBOARD_HOST` to the Pi's LAN address to bind only that interface. The default remains `0.0.0.0`, matching the original setup. Reserve the Pi's IP in your router for a stable bookmark.
 
+In Sports mode, select **Women's college volleyball** or **Men's college volleyball** and enable **Scroll scores** for the volleyball ticker. Match cards show sets won and points by set, or the start time for upcoming matches. Direct launches can use `./espn_jsonc --ncaavb --scrolling` or `./espn_jsonc --ncaamvb --scrolling`.
+
 ## Team logo updates
 
-From the repo root, generate team BMPs for NFL, college football, NBA, men's college basketball, MLB, and college baseball. The generator writes to `images/<league>/<ABBR>.bmp`. When multiple ESPN teams with artwork share an abbreviation, additional BMPs carry the ESPN team ID so the scoreboard can distinguish them.
+From the repo root, generate team BMPs for NFL, college football, NBA, men's college basketball, MLB, college baseball, and women's and men's college volleyball. The generator writes to `images/<league>/<ABBR>.bmp`. When multiple ESPN teams with artwork share an abbreviation, additional BMPs carry the ESPN team ID so the scoreboard can distinguish them.
 
 ```bash
 .venv-controller/bin/python -m pip install Pillow
@@ -38,7 +40,7 @@ Omit `--missing-only` to refresh existing logos. ESPN's dark-background artwork 
 
 ## Follow a school
 
-In Sports mode, enter an ESPN team abbreviation such as `NEB` in **Follow a school across sports**. This uses the school's games from the college football, men's college basketball, and college baseball scoreboards. The school selection takes precedence over the league and conference checkboxes. Clear it to use those checkboxes again. Scroll scores and Only show live games also work with a school selected. Direct launches can use `./espn_jsonc --school-team NEB --scrolling`.
+In Sports mode, enter an ESPN team abbreviation such as `NEB` in **Follow a school across sports**. This uses the school's games from the college football, men's college basketball, college baseball, and women's and men's college volleyball scoreboards. The school selection takes precedence over the league and conference checkboxes. Clear it to use those checkboxes again. Scroll scores and Only show live games also work with a school selected. Direct launches can use `./espn_jsonc --school-team NEB --scrolling`.
 
 When a league scoreboard has no game for the selected school, the display checks the school's schedule for a live game, its next matchup, or its latest result if no matchup is scheduled.
 

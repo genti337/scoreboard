@@ -158,16 +158,23 @@ bool SportsDisplay::determinePossessionDirection(int yardLine,
 }
 
 void SportsDisplay::draw_baseball(Competition& competition, int x_init, const std::string& images_dir) {
+    constexpr int logo_gap = 4;
     // Reset the Maximum X
     max_display_x = -999;
 
     // Away Team Logo
     drawImage(teamLogoPath(images_dir, competition.league, competition.AwayTeam), x_init);
 
-    // Away Team Abbreviation
-    int start_x = max_display_x;
-    draw_text(abbr_font, competition.AwayTeam.abbr, start_x, 9, brighterHex(competition.AwayTeam.color, competition.AwayTeam.alt_color));
-    if (competition.state != "in") draw_text(small_font, competition.AwayTeam.record, start_x, 30, rgb_matrix::Color(255, 255, 255));
+    auto draw_team = [&](const Team& team, int x) {
+        draw_text(abbr_font, team.abbr, x, 9, brighterHex(team.color, team.alt_color));
+        if (competition.state != "in")
+            draw_text(small_font, team.record, x, 30, rgb_matrix::Color(255, 255, 255));
+        if (competition.state != "pre") {
+            const int width = std::max(max_display_x - x, getTextWidth(font, team.score));
+            center_text(font, team.score, x, x + width, 20, 255, 255, 0);
+        }
+    };
+    draw_team(competition.AwayTeam, max_display_x + logo_gap);
  
     // Pre Game Display
     if (competition.state == "pre") {
@@ -185,7 +192,6 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
         int min_x = max_display_x;
         int max_x = std::max(min_x+getTextWidth(small_font, competition.shortDetail), min_x+18);
 
-        center_text(font, competition.AwayTeam.score, start_x, start_x + getTextWidth(font, competition.AwayTeam.abbr), 20, 255, 255, 0);
         center_text(small_font, competition.shortDetail, min_x, max_x, 30);
  
         std::ostringstream oss3("");
@@ -198,7 +204,7 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
         std::ostringstream oss6("");
         oss6 << images_dir << "base_empty.bmp";
         
-        start_x = min_x + (std::max(getTextWidth(small_font, competition.shortDetail), 18) - 18) / 2;
+        const int start_x = min_x + (std::max(getTextWidth(small_font, competition.shortDetail), 18) - 18) / 2;
         drawImage(competition.on_first ? oss5.str() : oss6.str(), start_x+12, 8);
         drawImage(competition.on_second ? oss5.str() : oss6.str(), start_x+6, 2);
         drawImage(competition.on_third ? oss5.str() : oss6.str(), start_x, 8);
@@ -219,23 +225,92 @@ void SportsDisplay::draw_baseball(Competition& competition, int x_init, const st
     } else if (competition.state == "post") {
        int min_x = max_display_x;
        int max_x = min_x + getTextWidth(small_font, competition.shortDetail);
-       center_text(font, competition.AwayTeam.score, start_x, start_x + getTextWidth(font, competition.AwayTeam.abbr), 20, 255, 255, 0);
        center_text(small_font, competition.shortDetail, min_x, max_x, 20);
     }
 
-    // Home Team Abbreviation
-    start_x = max_display_x;
-    draw_text(abbr_font, competition.HomeTeam.abbr, start_x, 9, brighterHex(competition.HomeTeam.color, competition.HomeTeam.alt_color));
-    if (competition.state != "in") draw_text(small_font, competition.HomeTeam.record, start_x, 30, rgb_matrix::Color(255, 255, 255));
-    if (competition.state != "pre") center_text(font, competition.HomeTeam.score, max_display_x-getTextWidth(font, competition.HomeTeam.abbr), max_display_x, 20, 255, 255, 0);
+    draw_team(competition.HomeTeam, max_display_x);
 
     // Home Team Logo
-    drawImage(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x);
+    drawImage(teamLogoPath(images_dir, competition.league, competition.HomeTeam), max_display_x + logo_gap);
 
     // Calculate the Width of the Game Display
     competition.game_display_width = max_display_x - x_init;
 
     return;
+}
+
+void SportsDisplay::draw_volleyball(Competition& game, int x_init, const std::string& images_dir) {
+    const auto white = rgb_matrix::Color(255, 255, 255);
+    const auto label = rgb_matrix::Color(150, 190, 225);
+    max_display_x = x_init;
+    if (game.AwayTeam.rank > 0 && game.AwayTeam.rank < 99)
+        draw_text(font, std::to_string(game.AwayTeam.rank), x_init, 8, white);
+    drawImageCentered(teamLogoPath(images_dir, game.league, game.AwayTeam), max_display_x, 0, 31);
+    center_text_vertically(font, "vs", max_display_x, max_display_x + 20, 0, 32, white);
+    if (game.HomeTeam.rank > 0 && game.HomeTeam.rank < 99) {
+        const auto rank = std::to_string(game.HomeTeam.rank);
+        draw_text(font, rank, max_display_x - getTextWidth(font, rank), 8, white);
+    }
+    drawImageCentered(teamLogoPath(images_dir, game.league, game.HomeTeam), max_display_x, 0, 31);
+    const int teams_x = max_display_x + 8;
+    draw_text(abbr_font, game.AwayTeam.abbr, teams_x, 10, brighterHex(game.AwayTeam.color, game.AwayTeam.alt_color));
+    draw_text(abbr_font, game.HomeTeam.abbr, teams_x, 26, brighterHex(game.HomeTeam.color, game.HomeTeam.alt_color));
+    if (!game.AwayTeam.record.empty()) draw_text(small_font, game.AwayTeam.record, teams_x + 1, 16, white);
+    if (!game.HomeTeam.record.empty()) draw_text(small_font, game.HomeTeam.record, teams_x + 1, 32, white);
+
+    if (game.state != "pre") {
+        constexpr int away_score_y = 14;
+        constexpr int home_score_y = 30;
+        const int sets_x = max_display_x + 6;
+        draw_text(small_font, "SETS", sets_x, 6, label);
+        draw_text(game_font, game.AwayTeam.score, sets_x, away_score_y, white);
+        draw_text(game_font, game.HomeTeam.score, sets_x, home_score_y, white);
+        if (game.state == "post") {
+            bool away_won = false;
+            bool home_won = false;
+            if (!game.winner_team_id.empty()) {
+                away_won = game.winner_team_id == game.AwayTeam.team_id;
+                home_won = game.winner_team_id == game.HomeTeam.team_id;
+            } else {
+                const auto valid_sets = [](const std::string& score) {
+                    return score.size() == 1 && score[0] >= '0' && score[0] <= '3';
+                };
+                if (valid_sets(game.AwayTeam.score) && valid_sets(game.HomeTeam.score)) {
+                    away_won = game.AwayTeam.score > game.HomeTeam.score;
+                    home_won = game.HomeTeam.score > game.AwayTeam.score;
+                }
+            }
+            const auto arrow = images_dir + "arrow.bmp";
+            const int arrow_x = max_display_x + 2;
+            if (away_won || home_won)
+                drawImage(arrow, arrow_x, (away_won ? away_score_y : home_score_y) - 7);
+            else
+                max_display_x = arrow_x + cachedImage(arrow).width;
+        }
+        for (size_t set = 0; set < game.home_set_points.size(); ++set) {
+            const auto& away = game.away_set_points[set];
+            const auto& home = game.home_set_points[set];
+            if (away.empty() && home.empty()) continue;
+            const int x = max_display_x + 6;
+            draw_text(small_font, "S" + std::to_string(set + 1), x, 6, label);
+            draw_text(game_font, away, x, away_score_y, white);
+            draw_text(game_font, home, x, home_score_y, white);
+        }
+    }
+
+    const int status_x = max_display_x + 10;
+    if (game.state == "pre") {
+        draw_text(game_font, game.day + " " + game.date, status_x, 12, label);
+        draw_text(game_font, game.time, status_x, 25, white);
+    } else {
+        std::string status = game.shortDetail;
+        if (game.state == "in" && !game.period.empty() && game.period != "0")
+            status = "Set " + game.period;
+        else if (status.empty())
+            status = game.state == "post" ? "Final" : "In progress";
+        draw_text(game_font, status, status_x, 20, label);
+    }
+    game.game_display_width = max_display_x - x_init;
 }
 
 void SportsDisplay::draw_basketball(Competition& competition, int x_init, const std::string& images_dir) {
@@ -576,7 +651,7 @@ void SportsDisplay::drawCelebration(const ScoringCelebration& event, const std::
     if (!show_kick && (event.label == "TOUCHDOWN!" || field_goal_good ||
         event.label == "EXTRA POINT GOOD")) {
         // Deterministic particles move with elapsed time, independent of frame rate.
-        const auto alternate = colorFromHex(event.team.alt_color);
+        const auto alternate = event.team.alt_color.empty() ? color : colorFromHex(event.team.alt_color);
         const int text_left = logo_width + 28;
         const int text_right = display_width - logo_width - 28;
         for (int i = 0; i < display_width / 5; ++i) {
@@ -809,15 +884,30 @@ const SportsDisplay::Card& SportsDisplay::competitionCard(std::vector<Competitio
         CardCanvas raster(canvas->height());
         render_target = &raster;
         if (competitions[index].sports_logo_comp) {
-           max_display_x = -999;
-           std::ostringstream oss1("");
-           oss1 << images_dir << competitions[index].league << ".bmp";
-           drawImage(oss1.str(), 0, 0);
+           static const std::map<std::string, std::string> league_labels{
+               {"nfl", "NFL"}, {"college-football", "FB"},
+               {"nba", "NBA"}, {"mens-college-basketball", "MBB"},
+               {"mlb", "MLB"}, {"college-baseball", "BASE"},
+               {"womens-college-volleyball", "W-VB"}, {"mens-college-volleyball", "M-VB"}
+           };
+           const auto& competition = competitions[index];
+           const auto label = league_labels.find(competition.league);
+           const auto& text = label == league_labels.end() ? competition.sport : label->second;
+           const bool pro_league = competition.league == "nfl" || competition.league == "nba" || competition.league == "mlb";
+           max_display_x = 0;
+           if (label != league_labels.end()) {
+               const auto logo = pro_league ? competition.league : "sport-dividers/" + competition.league;
+               drawImageCentered(images_dir + logo + ".bmp", 0, 0, 31);
+           }
+           if (max_display_x == 0)
+               draw_text(game_font, text, 0, 19, rgb_matrix::Color(188, 220, 250));
            competitions[index].game_display_width = max_display_x;
         } else if (competitions[index].sport == "baseball") {
            draw_baseball(competitions[index], 0, images_dir);
         } else if (competitions[index].sport == "basketball") {
            draw_basketball(competitions[index], 0, images_dir);
+        } else if (competitions[index].sport == "volleyball") {
+           draw_volleyball(competitions[index], 0, images_dir);
         } else if (competitions[index].sport == "football") {
            draw_football(competitions[index], 0, images_dir);
         }
@@ -922,11 +1012,16 @@ void SportsDisplay::draw(std::vector<Competition>& competitions, const std::stri
                competition_index[1] = (competition_index[1] + 1) % competitions.size();
            }
            canvas->Clear();
-	   if (competition_index[1] == 0 && competitions.size() > 1 && competitions[0].sports_logo_comp) competition_index[1] = 1;
+           for (size_t skipped = 0; skipped < competitions.size() && competitions[competition_index[1]].sports_logo_comp; ++skipped)
+               competition_index[1] = (competition_index[1] + 1) % competitions.size();
 
-           if (competitions[competition_index[1]].sport == "baseball") {
+           const auto& selected = competitions[competition_index[1]];
+           if (selected.sport == "volleyball" && !selected.sports_logo_comp) {
+              const auto& card = competitionCard(competitions, competition_index[1], images_dir);
+              drawCard(card, std::max(0, (canvas->width() - card.width) / 2));
+           } else if (selected.sport == "baseball" && !selected.sports_logo_comp) {
               draw_baseball(competitions[competition_index[1]], 0, images_dir);
-           } else if (competitions[competition_index[1]].sport == "football") {
+           } else if (selected.sport == "football" && !selected.sports_logo_comp) {
               draw_football2(competitions[competition_index[1]], 0, images_dir);
 
               int display_width = max_display_x;

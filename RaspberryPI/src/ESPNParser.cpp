@@ -144,6 +144,36 @@ int ESPNParser::getTeamRank(const json& team_json) {
     }
 }
 
+void ESPNParser::fillTeamColors(Team& team, const json& metadata) {
+    auto read_color = [&](const char* key) {
+        auto color = optionalText(metadata, key);
+        if (!color.empty() && color.front() == '#') color.erase(0, 1);
+        return color.size() == 6 && color.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos
+            ? color : std::string{};
+    };
+    if (team.color.empty()) team.color = read_color("color");
+    if (team.alt_color.empty()) team.alt_color = read_color("alternateColor");
+}
+
+std::map<std::string, std::string> ESPNParser::parseOverallStandings(const json& standings) {
+    std::map<std::string, std::string> records;
+    for (const auto& conference : standings.at("children")) {
+        if (!conference.contains("standings")) continue;
+        for (const auto& entry : conference.at("standings").at("entries")) {
+            const auto id = optionalText(entry.at("team"), "id");
+            if (id.empty()) continue;
+            for (const auto& stat : entry.at("stats")) {
+                if (optionalText(stat, "name") != "overall") continue;
+                auto record = optionalText(stat, "summary");
+                if (record.empty()) record = optionalText(stat, "displayValue");
+                if (!record.empty()) records.try_emplace(id, std::move(record));
+                break;
+            }
+        }
+    }
+    return records;
+}
+
 std::tuple<std::string, std::string, std::string> ESPNParser::convertToLocalTime(const std::string& utc_time_str) {
     if (utc_time_str.length() < 16) {
         return { "Invalid day", "Invalid date", "Invalid time" };
@@ -310,10 +340,6 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
 
                 const auto& teamObj = team.at("team");
 
-                auto get_color = [&](const char* key, const char* fallback) -> std::string {
-                    return teamObj.contains(key) ? teamObj.at(key).get<std::string>() : fallback;
-                };
-
                 auto conference_id = std::string("0");
                 if (league == "college-football") {
                     // conferenceId is sometimes absent
@@ -326,9 +352,28 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 const auto score_value = team.find("score");
                 if (score_value != team.end()) {
                     if (score_value->is_string()) score = score_value->get<std::string>();
+                    else if (sport == "volleyball" && score_value->is_number_integer()) score = score_value->dump();
                     else if (score_value->is_object()) {
                         const auto display_value = optionalText(*score_value, "displayValue");
                         if (!display_value.empty()) score = display_value;
+                    }
+                }
+                if (sport == "volleyball") {
+                    const auto winner = team.find("winner");
+                    if (winner != team.end() && winner->is_boolean() && winner->get<bool>())
+                        game.winner_team_id = optionalText(teamObj, "id");
+                    auto& points = is_home ? game.home_set_points : game.away_set_points;
+                    const auto linescores = team.find("linescores");
+                    if (linescores != team.end() && linescores->is_array()) {
+                        for (const auto& set : *linescores) {
+                            if (!set.is_object() || !set.contains("period") || !set["period"].is_number_integer()) continue;
+                            const int number = set["period"].get<int>();
+                            if (number < 1 || number > static_cast<int>(points.size())) continue;
+                            auto value = optionalText(set, "displayValue");
+                            if (value.empty() && set.contains("value") && set["value"].is_number())
+                                value = std::to_string(set["value"].get<int>());
+                            points[number - 1] = std::move(value);
+                        }
                     }
                 }
                 if (is_home) {
@@ -337,8 +382,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     game.HomeTeam.score = score;
                     game.HomeTeam.record = getTeamRecord(team);
                     game.HomeTeam.rank = getTeamRank(team);
-                    game.HomeTeam.color = get_color("color", "FFFFFF");
-                    game.HomeTeam.alt_color = get_color("alternateColor", "000000");
+                    fillTeamColors(game.HomeTeam, teamObj);
                     game.HomeTeam.conference_id = conference_id;
                 } else {
                     game.AwayTeam.team_id = teamObj.at("id").get<std::string>();
@@ -346,8 +390,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                     game.AwayTeam.score = score;
                     game.AwayTeam.record = getTeamRecord(team);
                     game.AwayTeam.rank = getTeamRank(team);
-                    game.AwayTeam.color = get_color("color", "FFFFFF");
-                    game.AwayTeam.alt_color = get_color("alternateColor", "000000");
+                    fillTeamColors(game.AwayTeam, teamObj);
                     game.AwayTeam.conference_id = conference_id;
                 }
             }
@@ -399,7 +442,7 @@ bool ESPNParser::parseESPNScoreboard(const std::string& jsonStr,
                 competitions.push_back(game);
             }
         }
-        if (!school_team.empty() && competitions.size() == logo_index + 1)
+        if ((!school_team.empty() || sport == "volleyball") && competitions.size() == logo_index + 1)
             competitions.pop_back();
 
     } catch (const nlohmann::json::exception& e) {

@@ -117,6 +117,8 @@ class ControllerTests(unittest.TestCase):
     def test_modes_build_expected_arguments(self):
         cases = [
             ({'mode': 'sports', 'NFL': '1', 'live_only': '1'}, ['--live-only', '--nfl']),
+            ({'mode': 'sports', 'NCAAVB': '1', 'scrolling': '1'}, ['--scrolling', '--ncaavb']),
+            ({'mode': 'sports', 'NCAAMVB': '1', 'live_only': '1'}, ['--live-only', '--ncaamvb']),
             ({'mode': 'sports', 'school_team': ' neb '}, ['--school-team', 'NEB']),
             ({'mode': 'sports', 'school_team': 'NEB', 'NFL': '1', 'conf': ['ACC|ncaaf'], 'live_only': '1'},
              ['--live-only', '--school-team', 'NEB']),

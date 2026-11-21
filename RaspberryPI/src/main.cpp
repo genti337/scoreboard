@@ -104,18 +104,29 @@ struct DisplayData {
     std::shared_ptr<const std::vector<Weather>> weather;
 };
 
-static std::string findSchoolTeamId(const std::string& league_url, const std::string& school_team) {
+struct LeagueTeams {
+    std::map<std::string, std::string> id_by_abbr;
+    std::map<std::string, json> team_by_id;
+};
+
+static LeagueTeams fetchLeagueTeams(const std::string& league_url) {
     FetchData fetcher(league_url + "/teams?limit=1000");
     const auto index = json::parse(fetcher.fetch());
+    LeagueTeams teams;
     for (const auto& sport : index.at("sports")) {
         for (const auto& league : sport.at("leagues")) {
             for (const auto& entry : league.at("teams")) {
                 const auto& team = entry.at("team");
-                if (team.value("abbreviation", "") == school_team) return team.at("id").get<std::string>();
+                const auto team_id = team.find("id");
+                if (team_id == team.end() || !team_id->is_string()) continue;
+                const auto id = team_id->get<std::string>();
+                if (const auto abbr = team.find("abbreviation"); abbr != team.end() && abbr->is_string())
+                    teams.id_by_abbr.try_emplace(abbr->get<std::string>(), id);
+                teams.team_by_id.try_emplace(id, team);
             }
         }
     }
-    return {};
+    return teams;
 }
 
 void fetch_loop(std::atomic<bool>& running, 
@@ -134,7 +145,9 @@ void fetch_loop(std::atomic<bool>& running,
     std::map<std::string, Weather> last_weather;
     std::map<std::string, std::pair<double, double>> weather_coordinates;
     ScoringCelebrations scoring;
-    std::map<std::string, std::string> school_team_ids;
+    std::map<std::string, LeagueTeams> league_teams;
+    std::map<std::string, std::string> basketball_records;
+    auto next_standings_refresh = std::chrono::steady_clock::time_point::min();
     std::string err;
 
     if (!celebration_preview.empty()) {
@@ -240,7 +253,7 @@ void fetch_loop(std::atomic<bool>& running,
                    }
                    // Postseason or unavailable metadata uses the current feed
                    // without forcing a regular-season year or week.
-               } else if (!school_team.empty()) {
+               } else if (!school_team.empty() || sports[i] == "volleyball") {
                    url << (leagues[i] == "mens-college-basketball" ? "?groups=50&limit=500" : "?limit=500");
                }
 
@@ -259,20 +272,62 @@ void fetch_loop(std::atomic<bool>& running,
                    std::cerr << "Scoreboard unavailable for " << leagues[i] << ": "
                              << (data.empty() ? "No data received" : err) << '\n';
                }
-               if (parsed && !school_team.empty() && next_competitions->size() == previous_size) {
-                   try {
-                       auto id = school_team_ids.find(leagues[i]);
-                       if (id == school_team_ids.end())
-                           id = school_team_ids.emplace(leagues[i], findSchoolTeamId(league_url, school_team)).first;
-                       if (id->second.empty()) continue;
+               if (!parsed) continue;
+               try {
+                   auto load_teams = [&]() -> const LeagueTeams& {
+                       const auto found = league_teams.find(league_url);
+                       if (found != league_teams.end()) return found->second;
+                       return league_teams.emplace(league_url, fetchLeagueTeams(league_url)).first->second;
+                   };
+                   if (!school_team.empty() && next_competitions->size() == previous_size) {
+                       const auto& teams = load_teams();
+                       const auto id = teams.id_by_abbr.find(school_team);
+                       if (id == teams.id_by_abbr.end()) continue;
                        FetchData schedule_fetcher(league_url + "/teams/" + id->second + "/schedule");
                        std::vector<Competition> schedule;
                        if (parser.parseESPNScoreboard(schedule_fetcher.fetch(), schedule, sports[i], leagues[i], {}, &err, school_team))
                            appendSchoolScheduleGame(schedule, *next_competitions);
                        else
                            std::cerr << "Schedule unavailable for " << leagues[i] << ": " << err << '\n';
-                   } catch (const std::exception& error) {
-                       std::cerr << "Schedule lookup failed for " << leagues[i] << ": " << error.what() << '\n';
+                   }
+                   for (size_t j = previous_size; j < next_competitions->size(); ++j) {
+                       auto& game = (*next_competitions)[j];
+                       if (game.sports_logo_comp) continue;
+                       for (auto* team : {&game.HomeTeam, &game.AwayTeam}) {
+                           if (!team->color.empty() && !team->alt_color.empty()) continue;
+                           const auto& teams = load_teams().team_by_id;
+                           const auto metadata = teams.find(team->team_id);
+                           if (metadata != teams.end()) ESPNParser::fillTeamColors(*team, metadata->second);
+                       }
+                   }
+               } catch (const std::exception& error) {
+                   std::cerr << "Team data lookup failed for " << leagues[i] << ": " << error.what() << '\n';
+               }
+               if (leagues[i] == "mens-college-basketball") {
+                   std::vector<Team*> missing_records;
+                   for (size_t j = previous_size; j < next_competitions->size(); ++j) {
+                       auto& game = (*next_competitions)[j];
+                       if (game.sports_logo_comp) continue;
+                       for (auto* team : {&game.HomeTeam, &game.AwayTeam})
+                           if (team->record.empty() && !team->team_id.empty()) missing_records.push_back(team);
+                   }
+                   const auto now = std::chrono::steady_clock::now();
+                   if (!missing_records.empty() && now >= next_standings_refresh) {
+                       next_standings_refresh = now + std::chrono::minutes(1);
+                       try {
+                           FetchData standings("https://site.api.espn.com/apis/v2/sports/basketball/mens-college-basketball/standings");
+                           auto records = ESPNParser::parseOverallStandings(json::parse(standings.fetch()));
+                           if (!records.empty()) {
+                               basketball_records = std::move(records);
+                               next_standings_refresh = now + std::chrono::minutes(15);
+                           }
+                       } catch (const std::exception& error) {
+                           std::cerr << "Basketball standings unavailable: " << error.what() << '\n';
+                       }
+                   }
+                   for (auto* team : missing_records) {
+                       const auto record = basketball_records.find(team->team_id);
+                       if (record != basketball_records.end()) team->record = record->second;
                    }
                }
             }
@@ -430,6 +485,7 @@ void display_loop(std::atomic<bool>& running,
             else if (!competitions.empty()) display.draw(competitions, "../images/", scroll_pixels);
             else if (live_only) display.drawMessage(scores ? "No live games" : "Fetching scores...");
             else if (!school_team.empty()) display.drawMessage(scores ? "No games for " + school_team : "Fetching scores...");
+            else if (active_display == "sports") display.drawMessage(scores ? "No games" : "Fetching scores...");
         }
 
         // Rendering and VSync waiting count toward the 25 ms frame budget.
@@ -451,6 +507,8 @@ int main(int argc, char* argv[]) {
        {"--mlb", {"baseball", "mlb"}},
        {"--ncaaf", {"football", "college-football"}},
        {"--nfl", {"football", "nfl"}},
+       {"--ncaavb", {"volleyball", "womens-college-volleyball"}},
+       {"--ncaamvb", {"volleyball", "mens-college-volleyball"}},
     };
     std::vector<std::string> cities;
     std::string default_city;
@@ -568,8 +626,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (active_display == "sports" && !school_team.empty()) {
-        sports = {"football", "basketball", "baseball"};
-        leagues = {"college-football", "mens-college-basketball", "college-baseball"};
+        sports = {"football", "basketball", "baseball", "volleyball", "volleyball"};
+        leagues = {"college-football", "mens-college-basketball", "college-baseball",
+                   "womens-college-volleyball", "mens-college-volleyball"};
     } else {
         school_team.clear();
     }
